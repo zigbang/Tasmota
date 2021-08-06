@@ -354,9 +354,9 @@ const char HTTP_TABLE100[] PROGMEM =
 
 const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
-
+// TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
+  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT Sonoff %s " D_BY " ZIGBANG</a></div>"
   "</div>"
   "</body>"
   "</html>";
@@ -499,23 +499,13 @@ typedef struct WebServerDispatch_t {
 
 const WebServerDispatch_t WebServerDispatch[] PROGMEM = {
   { "",   HTTP_ANY, HandleRoot },
-  { "up", HTTP_ANY, HandleUpgradeFirmware },
-  { "u1", HTTP_ANY, HandleUpgradeFirmwareStart },   // OTA
   { "u2", HTTP_OPTIONS, HandlePreflightRequest },
-  { "u3", HTTP_ANY, HandleUploadDone },
   { "mn", HTTP_GET, HandleManagement },
-  { "cs", HTTP_GET, HandleConsole },
   { "cs", HTTP_OPTIONS, HandlePreflightRequest },
   { "cm", HTTP_ANY, HandleHttpCommand },
 #ifndef FIRMWARE_MINIMAL
   { "cn", HTTP_ANY, HandleConfiguration },
-  { "md", HTTP_ANY, HandleModuleConfiguration },
   { "wi", HTTP_ANY, HandleWifiConfiguration },
-  { "lg", HTTP_ANY, HandleLoggingConfiguration },
-  { "tp", HTTP_ANY, HandleTemplateConfiguration },
-  { "co", HTTP_ANY, HandleOtherConfiguration },
-  { "dl", HTTP_ANY, HandleBackupConfiguration },
-  { "rs", HTTP_ANY, HandleRestoreConfiguration },
   { "rt", HTTP_ANY, HandleResetConfiguration },
   { "in", HTTP_ANY, HandleInformation },
 #endif  // Not FIRMWARE_MINIMAL
@@ -551,7 +541,6 @@ void StartWebserver(int type, IPAddress ipweb)
       }
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
-      Webserver->on("/u2", HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
       XdrvCall(FUNC_WEB_ADD_HANDLER);
       XsnsCall(FUNC_WEB_ADD_HANDLER);
@@ -660,6 +649,7 @@ void HttpHeaderCors(void)
 void WSHeaderSend(void)
 {
   char server[32];
+  // TODO: ZIoT 버전 변경
   snprintf_P(server, sizeof(server), PSTR("Tasmota/%s (%s)"), TasmotaGlobal.version, GetDeviceHardware().c_str());
   Webserver->sendHeader(F("Server"), server);
   Webserver->sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
@@ -808,7 +798,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
   WebColor(COL_TEXT_WARNING),
 #endif
   WebColor(COL_TITLE),
-  (Web.initial_config) ? "" : ModuleName().c_str(), SettingsText(SET_DEVICENAME));
+  (Web.initial_config) ? "" : "ZIGBANG", SettingsText(SET_DEVICENAME));
 
   // SetOption53 - Show hostname and IP address in GUI main menu
 #if (RESTART_AFTER_INITIAL_WIFI_CONFIG)
@@ -900,6 +890,7 @@ void WSContentStop(void)
       WSContentSend_P(HTTP_COUNTER);
     }
   }
+  // TODO: ZIoT 버전 변경
   WSContentSend_P(HTTP_END, TasmotaGlobal.version);
   WSContentEnd();
 }
@@ -1028,20 +1019,13 @@ void HandleRoot(void)
 
   if (WifiIsInManagerMode()) {
 #ifndef FIRMWARE_MINIMAL
-    if (strlen(SettingsText(SET_WEBPWD)) && !(Webserver->hasArg(F("USER1"))) && !(Webserver->hasArg(F("PASS1"))) && HTTP_MANAGER_RESET_ONLY != Web.state) {
-      HandleWifiLogin();
-    } else {
       if (!strlen(SettingsText(SET_WEBPWD)) || (((Webserver->arg(F("USER1")) == WEB_USERNAME ) && (Webserver->arg(F("PASS1")) == SettingsText(SET_WEBPWD) )) || HTTP_MANAGER_RESET_ONLY == Web.state)) {
         if (!Web.initial_config) {
           Web.initial_config = !strlen(SettingsText(SET_STASSID1));
           if (Web.initial_config) { AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP "Blank Device - Initial Configuration")); }
         }
         HandleWifiConfiguration();
-      } else {
-        // wrong user and pass
-        HandleWifiLogin();
       }
-    }
 #endif  // Not FIRMWARE_MINIMAL
     return;
   }
@@ -1065,159 +1049,6 @@ void HandleRoot(void)
   WSContentSendStyle();
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
-  if (TasmotaGlobal.devices_present) {
-#ifdef USE_LIGHT
-    if (TasmotaGlobal.light_type) {
-      uint8_t light_subtype = TasmotaGlobal.light_type &7;
-      if (!Settings->flag3.pwm_multi_channels) {  // SetOption68 0 - Enable multi-channels PWM instead of Color PWM
-        bool split_white = ((LST_RGBW <= light_subtype) && (TasmotaGlobal.devices_present > 1));  // Only on RGBW or RGBCW and SetOption37 128
-
-        if ((LST_COLDWARM == light_subtype) || ((LST_RGBCW == light_subtype) && !split_white)) {
-          WebSliderColdWarm();
-        }
-
-        if (light_subtype > 2) {  // No W or CW
-          uint16_t hue;
-          uint8_t sat;
-          LightGetHSB(&hue, &sat, nullptr);
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Hue
-            PSTR("b"),             // b - Unique HTML id
-            PSTR("#800"), PSTR("#f00 5%,#ff0 20%,#0f0 35%,#0ff 50%,#00f 65%,#f0f 80%,#f00 95%,#800"),  // Hue colors
-            2,               // sl2 - Unique range HTML id - Used as source for Saturation end color
-            1, 359,          // Range valid Hue
-            hue,
-            'h', 0);         // h0 - Value id
-
-          uint8_t dcolor = changeUIntScale(Settings->light_dimmer, 0, 100, 0, 255);
-          char scolor[8];
-          snprintf_P(scolor, sizeof(scolor), PSTR("#%02X%02X%02X"), dcolor, dcolor, dcolor);  // Saturation start color from Black to White
-          uint8_t red, green, blue;
-          HsToRgb(hue, 255, &red, &green, &blue);
-          snprintf_P(stemp, sizeof(stemp), PSTR("#%02X%02X%02X"), red, green, blue);  // Saturation end color
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Saturation
-            PSTR("s"),             // s - Unique HTML id related to eb('s').style.background='linear-gradient(to right,rgb('+sl+'%%,'+sl+'%%,'+sl+'%%),hsl('+eb('sl2').value+',100%%,50%%))';
-            scolor, stemp,   // Brightness to max current color
-            3,               // sl3 - Unique range HTML id - Not used
-            0, 100,          // Range 0 to 100%
-            changeUIntScale(sat, 0, 255, 0, 100),
-            'n', 0);         // n0 - Value id
-        }
-
-        WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Brightness - Black to White
-          PSTR("c"),               // c - Unique HTML id
-          PSTR("#000"), PSTR("#fff"),    // Black to White
-          4,                 // sl4 - Unique range HTML id - Used as source for Saturation begin color
-          Settings->flag3.slider_dimmer_stay_on, 100,  // Range 0/1 to 100% (SetOption77 - Do not power off if slider moved to far left)
-          Settings->light_dimmer,
-          'd', 0);           // d0 - Value id is related to lc("d0", value) and WebGetArg("d0", tmp, sizeof(tmp));
-
-        if (split_white) {   // SetOption37 128
-          if (LST_RGBCW == light_subtype) {
-            WebSliderColdWarm();
-          }
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // White brightness - Black to White
-            PSTR("f"),             // f - Unique HTML id
-            PSTR("#000"), PSTR("#fff"),  // Black to White
-            5,               // sl5 - Unique range HTML id - Not used
-            Settings->flag3.slider_dimmer_stay_on, 100,  // Range 0/1 to 100% (SetOption77 - Do not power off if slider moved to far left)
-            LightGetDimmer(2),
-            'w', 0);         // w0 - Value id is related to lc("w0", value) and WebGetArg("w0", tmp, sizeof(tmp));
-        }
-      } else {  // Settings->flag3.pwm_multi_channels - SetOption68 1 - Enable multi-channels PWM instead of Color PWM
-        uint32_t pwm_channels = light_subtype > LST_MAX ? LST_MAX : light_subtype;
-        stemp[0] = 'e'; stemp[1] = '0'; stemp[2] = '\0';  // d0
-        for (uint32_t i = 0; i < pwm_channels; i++) {
-          stemp[1]++;        // e1 to e5 - Make unique ids
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Channel brightness - Black to White
-            stemp,           // e1 to e5 - Unique HTML id
-            PSTR("#000"), PSTR("#fff"),  // Black to White
-            i+1,             // sl1 to sl5 - Unique range HTML id - Not used
-            1, 100,          // Range 1 to 100%
-            changeUIntScale(Settings->light_color[i], 0, 255, 0, 100),
-            'e', i+1);       // e1 to e5 - Value id
-        }
-      }  // Settings->flag3.pwm_multi_channels
-    }
-#endif // USE_LIGHT
-#ifdef USE_SHUTTER
-    if (Settings->flag3.shutter_mode) {  // SetOption80 - Enable shutter support
-      for (uint32_t i = 0; i < TasmotaGlobal.shutters_present; i++) {
-        WSContentSend_P(HTTP_MSG_SLIDER_SHUTTER, Settings->shutter_position[i], i+1);
-      }
-    }
-#endif  // USE_SHUTTER
-    WSContentSend_P(HTTP_TABLE100);
-    WSContentSend_P(PSTR("<tr>"));
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      WSContentSend_P(HTTP_DEVICE_CONTROL, 36, 1,
-        (strlen(SettingsText(SET_BUTTON1))) ? SettingsText(SET_BUTTON1) : PSTR(D_BUTTON_TOGGLE),
-        "");
-      for (uint32_t i = 0; i < MaxFanspeed(); i++) {
-        snprintf_P(stemp, sizeof(stemp), PSTR("%d"), i);
-        WSContentSend_P(HTTP_DEVICE_CONTROL, 16, i +2,
-          (strlen(SettingsText(SET_BUTTON2 + i))) ? SettingsText(SET_BUTTON2 + i) : stemp,
-          "");
-      }
-    } else {
-#endif  // USE_SONOFF_IFAN
-      uint32_t cols = WebDeviceColumns();
-      for (uint32_t idx = 1; idx <= TasmotaGlobal.devices_present; idx++) {
-        bool set_button = ((idx <= MAX_BUTTON_TEXT) && strlen(SettingsText(SET_BUTTON1 + idx -1)));
-#ifdef USE_SHUTTER
-        int32_t ShutterWebButton;
-        if (ShutterWebButton = IsShutterWebButton(idx)) {
-          WSContentSend_P(HTTP_DEVICE_CONTROL, 100 / cols, idx,
-            (set_button) ? SettingsText(SET_BUTTON1 + idx -1) : ((Settings->shutter_options[abs(ShutterWebButton)-1] & 2) /* is locked */ ? "-" : ((Settings->shutter_options[abs(ShutterWebButton)-1] & 8) /* invert web buttons */ ? ((ShutterWebButton>0) ? "&#9660;" : "&#9650;") : ((ShutterWebButton>0) ? "&#9650;" : "&#9660;"))),
-            "");
-        } else {
-#endif  // USE_SHUTTER
-          snprintf_P(stemp, sizeof(stemp), PSTR(" %d"), idx);
-          WSContentSend_P(HTTP_DEVICE_CONTROL, 100 / cols, idx,
-            (set_button) ? SettingsText(SET_BUTTON1 + idx -1) : (cols < 5) ? PSTR(D_BUTTON_TOGGLE) : "",
-            (set_button) ? "" : (TasmotaGlobal.devices_present > 1) ? stemp : "");
-#ifdef USE_SHUTTER
-        }
-#endif  // USE_SHUTTER
-        if (0 == idx % cols) { WSContentSend_P(PSTR("</tr><tr>")); }
-      }
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-#ifdef USE_TUYA_MCU
-  if (IsModuleTuya()) {
-    if (AsModuleTuyaMS()) {
-      WSContentSend_P(HTTP_TABLE100);
-      WSContentSend_P(PSTR("<tr><div></div>"));
-      snprintf_P(stemp, sizeof(stemp), PSTR("" D_JSON_IRHVAC_MODE ""));
-      WSContentSend_P(HTTP_DEVICE_CONTROL, 26, TasmotaGlobal.devices_present + 1,
-        (strlen(SettingsText(SET_BUTTON1 + TasmotaGlobal.devices_present))) ? SettingsText(SET_BUTTON1 + TasmotaGlobal.devices_present) : stemp, "");
-      WSContentSend_P(PSTR("</tr></table>"));
-    }
-  }
-#endif  // USE_TUYA_MCU
-#ifdef USE_SONOFF_RF
-  if (SONOFF_BRIDGE == TasmotaGlobal.module_type) {
-    WSContentSend_P(HTTP_TABLE100);
-    WSContentSend_P(PSTR("<tr>"));
-    uint32_t idx = 0;
-    for (uint32_t i = 0; i < 4; i++) {
-      if (idx > 0) { WSContentSend_P(PSTR("</tr><tr>")); }
-      for (uint32_t j = 0; j < 4; j++) {
-        idx++;
-        snprintf_P(stemp, sizeof(stemp), PSTR("%d"), idx);
-        WSContentSend_P(PSTR("<td style='width:25%%'><button onclick='la(\"&k=%d\");'>%s</button></td>"), idx,  // &k is related to WebGetArg("k", tmp, sizeof(tmp));
-          (strlen(SettingsText(SET_BUTTON1 + idx -1))) ? SettingsText(SET_BUTTON1 + idx -1) : stemp);
-      }
-    }
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-#endif  // USE_SONOFF_RF
 
 #ifndef FIRMWARE_MINIMAL
   XdrvCall(FUNC_WEB_ADD_MAIN_BUTTON);
@@ -1225,19 +1056,8 @@ void HandleRoot(void)
 #endif  // Not FIRMWARE_MINIMAL
 
   if (HTTP_ADMIN == Web.state) {
-#ifdef FIRMWARE_MINIMAL
-    WSContentSpaceButton(BUTTON_FIRMWARE_UPGRADE);
-    WSContentButton(BUTTON_CONSOLE);
-#else
     WSContentSpaceButton(BUTTON_CONFIGURATION);
     WSContentButton(BUTTON_INFORMATION);
-    WSContentButton(BUTTON_FIRMWARE_UPGRADE);
-    if (!WebUseManagementSubmenu()) {
-      WSContentButton(BUTTON_CONSOLE);
-    } else {
-      WSContentButton(BUTTON_MANAGEMENT);
-    }
-#endif  // Not FIRMWARE_MINIMAL
     WSContentButton(BUTTON_RESTART);
   }
   WSContentStop();
@@ -1258,134 +1078,9 @@ bool HandleRootStatusRefresh(void)
     Script_Check_HTML_Setvars();
   #endif
 
-  char tmp[8];                       // WebGetArg numbers only
   char svalue[32];                   // Command and number parameter
-  char webindex[5];                  // WebGetArg name
 
-  WebGetArg(PSTR("o"), tmp, sizeof(tmp));  // 1 - 16 Device number for button Toggle or Fanspeed
-  if (strlen(tmp)) {
-    ShowWebSource(SRC_WEBGUI);
-    uint32_t device = atoi(tmp);
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      if (device < 2) {
-        ExecuteCommandPower(1, POWER_TOGGLE, SRC_IGNORE);
-      } else {
-        snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_FANSPEED " %d"), device -2);
-        ExecuteCommand(svalue, SRC_WEBGUI);
-      }
-    } else {
-#endif  // USE_SONOFF_IFAN
-#ifdef USE_TUYA_MCU
-    if (IsModuleTuya()) {
-      if (device <= TasmotaGlobal.devices_present) {
-        ExecuteCommandPower(device, POWER_TOGGLE, SRC_IGNORE);
-      } else {
-        if (AsModuleTuyaMS() && device == TasmotaGlobal.devices_present + 1) {
-          uint8_t dpId = TuyaGetDpId(TUYA_MCU_FUNC_MODESET);
-          snprintf_P(svalue, sizeof(svalue), PSTR("Tuyasend4 %d,%d"), dpId, !TuyaModeSet());
-          ExecuteCommand(svalue, SRC_WEBGUI);
-        }
-      }
-    } else {
-#endif  // USE_TUYA_MCU
-#ifdef USE_SHUTTER
-      int32_t ShutterWebButton;
-      if (ShutterWebButton = IsShutterWebButton(device)) {
-        snprintf_P(svalue, sizeof(svalue), PSTR("ShutterPosition%d %s"), abs(ShutterWebButton), (ShutterWebButton>0) ? PSTR(D_CMND_SHUTTER_STOPOPEN) : PSTR(D_CMND_SHUTTER_STOPCLOSE));
-        ExecuteWebCommand(svalue);
-      } else {
-#endif  // USE_SHUTTER
-        ExecuteCommandPower(device, POWER_TOGGLE, SRC_IGNORE);
-#ifdef USE_SHUTTER
-      }
-#endif  // USE_SHUTTER
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-#ifdef USE_TUYA_MCU
-    }
-#endif  // USE_TUYA_MCU
-  }
-#ifdef USE_LIGHT
-  WebGetArg(PSTR("d0"), tmp, sizeof(tmp));  // 0 - 100 Dimmer value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_DIMMER " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("w0"), tmp, sizeof(tmp));  // 0 - 100 White value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_WHITE " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  uint32_t light_device = LightDevice();  // Channel number offset
-  uint32_t pwm_channels = (TasmotaGlobal.light_type & 7) > LST_MAX ? LST_MAX : (TasmotaGlobal.light_type & 7);
-  for (uint32_t j = 0; j < pwm_channels; j++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("e%d"), j +1);
-    WebGetArg(webindex, tmp, sizeof(tmp));  // 0 - 100 percent
-    if (strlen(tmp)) {
-      snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_CHANNEL "%d %s"), j +light_device, tmp);
-      ExecuteWebCommand(svalue);
-    }
-  }
-  WebGetArg(PSTR("t0"), tmp, sizeof(tmp));  // 153 - 500 Color temperature
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_COLORTEMPERATURE " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("h0"), tmp, sizeof(tmp));  // 0 - 359 Hue value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_HSBCOLOR  "1 %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("n0"), tmp, sizeof(tmp));  // 0 - 99 Saturation value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_HSBCOLOR  "2 %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-#endif  // USE_LIGHT
-#ifdef USE_SHUTTER
-  for (uint32_t j = 1; j <= TasmotaGlobal.shutters_present; j++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("u%d"), j);
-    WebGetArg(webindex, tmp, sizeof(tmp));  // 0 - 100 percent
-    if (strlen(tmp)) {
-      snprintf_P(svalue, sizeof(svalue), PSTR("ShutterPosition%d %s"), j, tmp);
-      ExecuteWebCommand(svalue);
-    }
-  }
-#endif  // USE_SHUTTER
-#ifdef USE_SONOFF_RF
-  WebGetArg(PSTR("k"), tmp, sizeof(tmp));  // 1 - 16 Pre defined RF keys
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_RFKEY "%s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-#endif  // USE_SONOFF_RF
-#ifdef USE_ZIGBEE
-  WebGetArg(PSTR("zbj"), tmp, sizeof(tmp));
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR("ZbPermitJoin"));
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("zbr"), tmp, sizeof(tmp));
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR("ZbMap"));
-    ExecuteWebCommand(svalue);
-  }
-#endif // USE_ZIGBEE
-
-#ifdef USE_WEB_SSE
-  WSContentBegin(200, CT_STREAM);
-  WSContentSend_P(PSTR("data: "));
-#else
-  WSContentBegin(200, CT_HTML);
-#endif  // USE_WEB_SSE
-  WSContentSend_P(PSTR("{t}"));
-  XsnsCall(FUNC_WEB_SENSOR);
-  XdrvCall(FUNC_WEB_SENSOR);
-
-  WSContentSend_P(PSTR("</table>"));
-
+/* TODO: 현재 상태 표시로 활용 가능
   if (TasmotaGlobal.devices_present) {
     WSContentSend_P(PSTR("{t}<tr>"));
 #ifdef USE_SONOFF_IFAN
@@ -1410,6 +1105,7 @@ bool HandleRootStatusRefresh(void)
 
     WSContentSend_P(PSTR("</tr></table>"));
   }
+  */
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
   WSContentEnd();
 
@@ -1445,19 +1141,9 @@ void HandleConfiguration(void)
   WSContentStart_P(PSTR(D_CONFIGURATION));
   WSContentSendStyle();
 
-  WSContentButton(BUTTON_MODULE);
   WSContentButton(BUTTON_WIFI);
 
-  XdrvCall(FUNC_WEB_ADD_BUTTON);
-  XsnsCall(FUNC_WEB_ADD_BUTTON);
-
-  WSContentButton(BUTTON_LOGGING);
-  WSContentButton(BUTTON_OTHER);
-  WSContentButton(BUTTON_TEMPLATE);
-
   WSContentSpaceButton(BUTTON_RESET_CONFIGURATION);
-  WSContentButton(BUTTON_BACKUP);
-  WSContentButton(BUTTON_RESTORE);
 
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
@@ -2255,6 +1941,7 @@ void HandleInformation(void)
   // }2 = </th><td>
   WSContentSend_P(HTTP_SCRIPT_INFO_BEGIN);
   WSContentSend_P(PSTR("<table style='width:100%%'><tr><th>"));
+  // TODO: ZIoT 버전 변경
   WSContentSend_P(PSTR(D_PROGRAM_VERSION "}2%s%s"), TasmotaGlobal.version, TasmotaGlobal.image_name);
   WSContentSend_P(PSTR("}1" D_BUILD_DATE_AND_TIME "}2%s"), GetBuildDateAndTime().c_str());
   WSContentSend_P(PSTR("}1" D_CORE_AND_SDK_VERSION "}2" ARDUINO_CORE_RELEASE "/%s"), ESP.getSdkVersion());
