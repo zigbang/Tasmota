@@ -34,6 +34,26 @@
  *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
 \*****************************************************************************************************/
 
+#undef  CFG_HOLDER
+#define CFG_HOLDER        4618
+
+#undef  MQTT_HOST
+#define MQTT_HOST         "a3krw5nopfpfqu-ats.iot.ap-northeast-2.amazonaws.com" // [MqttHost]
+
+#undef  MQTT_PORT
+#define MQTT_PORT         8883                   // [MqttPort] MQTT port (10123 on CloudMQTT)
+
+#ifndef USE_MQTT_TLS
+#define USE_MQTT_TLS
+#define USE_MQTT_TLS_CA_CERT // Optional but highly recommended
+#endif
+#ifndef USE_MQTT_AWS_IOT
+#define USE_MQTT_AWS_IOT
+#endif
+#ifdef USE_DISCOVERY
+#undef USE_DISCOVERY
+#endif
+
 /*
 Examples :
 
