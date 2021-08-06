@@ -35,7 +35,7 @@
 \*****************************************************************************************************/
 
 #undef  CFG_HOLDER
-#define CFG_HOLDER        4618
+#define CFG_HOLDER        4617
 
 #undef  MQTT_HOST
 #define MQTT_HOST         "a3krw5nopfpfqu-ats.iot.ap-northeast-2.amazonaws.com" // [MqttHost]
