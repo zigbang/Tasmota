@@ -23,6 +23,8 @@
 
 // #define DEBUG_DUMP_TLS    // allow dumping of TLS Flash keys
 
+#include "tasmota_cert.h"
+
 #ifdef USE_MQTT_TLS
   #include "WiFiClientSecureLightBearSSL.h"
   BearSSL::WiFiClientSecure_light *tlsClient;
@@ -215,6 +217,9 @@ void MqttInit(void) {
 #else // ESP32 - ESP8266
     tlsClient = new BearSSL::WiFiClientSecure_light(1024,1024);
 #endif
+
+ConvertTlsFile(0);
+ConvertTlsFile(1);
 
 #ifdef USE_MQTT_AWS_IOT
     loadTlsDir();   // load key and certificate data from Flash
@@ -1583,6 +1588,99 @@ void loadTlsDir(void) {
 }
 
 const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate buffer.";
+
+void ConvertTlsFile(uint8_t cert) {
+  tls_dir_t *tls_dir_write;
+
+  uint8_t *spi_buffer = (uint8_t*) malloc(tls_spi_len);
+  if (!spi_buffer) {
+    AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
+    return;
+  }
+  if (tls_spi_start != nullptr) {  // safeguard for ESP32
+    memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
+  } else {
+    memset(spi_buffer, 0, tls_spi_len);   // safeguard for ESP32, removed by compiler for ESP8266
+  }
+
+  char* tls_file = cert ? (char*)AmazonClientCert : (char*)AmazonPrivateKey;
+
+  RemoveSpace(tls_file);
+
+  uint32_t bin_len = decode_base64_length((unsigned char*)tls_file);
+  uint8_t  *bin_buf = nullptr;
+  if (bin_len > 0) {
+    bin_buf = (uint8_t*) malloc(bin_len + 4);
+    if (!bin_buf) {
+      AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
+      free(spi_buffer);
+      return;
+    }
+  }
+
+  if (bin_len > 0) {
+    decode_base64((unsigned char*)tls_file, bin_buf);
+  }
+
+  // address of writable tls_dir in buffer
+  tls_dir_write = (tls_dir_t*) (spi_buffer + tls_block_offset);
+
+  bool save_file = false;   // for ESP32, do we need to write file
+
+  if (!cert) {
+    TlsEraseBuffer(spi_buffer);   // Erase any previously stored data
+
+    if (bin_len > 0) {
+      if (bin_len != 32) {
+        // no private key was previously stored, abort
+        AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate must be 32 bytes: %d."), bin_len);
+        free(spi_buffer);
+        free(bin_buf);
+        return;
+      }
+      tls_entry_t *entry = &tls_dir_write->entry[0];
+      entry->name = TLS_NAME_SKEY;
+      entry->start = 0;
+      entry->len = bin_len;
+      memcpy(spi_buffer + tls_obj_store_offset + entry->start, bin_buf, entry->len);
+      save_file = true;
+    } else {
+      // if lenght is zero, simply erase this SPI flash area
+    }
+  } else {
+    // Try to write Certificate
+    if (TLS_NAME_SKEY != tls_dir.entry[0].name) {
+      // no private key was previously stored, abort
+      AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: cannot store Cert if no Key previously stored."));
+      free(spi_buffer);
+      free(bin_buf);
+      return;
+    }
+    if (bin_len <= 256) {
+      // Certificate lenght too short
+      AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate length too short: %d."), bin_len);
+      free(spi_buffer);
+      free(bin_buf);
+      return;
+    }
+
+    tls_entry_t *entry = &tls_dir_write->entry[1];
+    entry->name = TLS_NAME_CRT;
+    entry->start = (tls_dir_write->entry[0].start + tls_dir_write->entry[0].len + 3) & ~0x03; // align to 4 bytes boundary
+    entry->len = bin_len;
+    memcpy(spi_buffer + tls_obj_store_offset + entry->start, bin_buf, entry->len);
+    save_file = true;
+  }
+
+  if (ESP.flashEraseSector(tls_spi_start_sector)) {
+    ESP.flashWrite(tls_spi_start_sector * SPI_FLASH_SEC_SIZE, (uint32_t*) spi_buffer, SPI_FLASH_SEC_SIZE);
+  }
+
+  free(spi_buffer);
+  free(bin_buf);
+
+  loadTlsDir();   // reload into memory any potential change
+}
 
 void CmndTlsKey(void) {
 #ifdef DEBUG_DUMP_TLS
