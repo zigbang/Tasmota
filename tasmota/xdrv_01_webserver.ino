@@ -356,7 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT Sonoff %s " D_BY " ZIGBANG</a></div>"
+  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT Sonoff %s " D_BY " (주)직방</a></div>"
   "</div>"
   "</body>"
   "</html>";
@@ -798,7 +798,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
   WebColor(COL_TEXT_WARNING),
 #endif
   WebColor(COL_TITLE),
-  (Web.initial_config) ? "" : "ZIGBANG", SettingsText(SET_DEVICENAME));
+  "", SettingsText(SET_DEVICENAME));
 
   // SetOption53 - Show hostname and IP address in GUI main menu
 #if (RESTART_AFTER_INITIAL_WIFI_CONFIG)
@@ -1671,7 +1671,7 @@ void HandleWifiConfiguration(void) {
     WSContentSend_P(HTTP_FORM_WIFI_PART1, (WifiIsInManagerMode()) ? "" : PSTR(" (" STA_SSID1 ")"), SettingsText(SET_STASSID1));
     if (WifiIsInManagerMode()) {
       // As WIFI_HOSTNAME may contain %s-%04d it cannot be part of HTTP_FORM_WIFI where it will exception
-      WSContentSend_P(PSTR("></p>"));
+      WSContentSend_P(PSTR("></p><p><b> 기기 별명 </b><br><input id='d' placeholder=\" 기기 별명을 입력해주세요 \"></p>"));
     } else {
       WSContentSend_P(HTTP_FORM_WIFI_PART2, SettingsText(SET_STASSID2), WIFI_HOSTNAME, WIFI_HOSTNAME, SettingsText(SET_HOSTNAME), SettingsText(SET_CORS));
     }

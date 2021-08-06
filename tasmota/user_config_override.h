@@ -43,8 +43,8 @@
 #undef  MQTT_PORT
 #define MQTT_PORT         8883                   // [MqttPort] MQTT port (10123 on CloudMQTT)
 
-#define STA_SSID1              "U+Net8F50"                // [Ssid1] Wi-Fi SSID
-#define STA_PASS1              "D2B662A0P@"                // [Password1] Wi-Fi password
+//#define STA_SSID1              "U+Net8F50"                // [Ssid1] Wi-Fi SSID
+//#define STA_PASS1              "D2B662A0P@"                // [Password1] Wi-Fi password
 
 #ifndef USE_MQTT_TLS
 #define USE_MQTT_TLS
