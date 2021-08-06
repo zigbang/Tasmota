@@ -364,7 +364,7 @@
 //#define MY_LANGUAGE            he_HE           // Hebrew in Israel
 //#define MY_LANGUAGE            hu_HU           // Hungarian in Hungary
 //#define MY_LANGUAGE            it_IT           // Italian in Italy
-//#define MY_LANGUAGE            ko_KO           // Korean in Korea
+#define MY_LANGUAGE            ko_KO           // Korean in Korea
 //#define MY_LANGUAGE            nl_NL           // Dutch in the Nederland
 //#define MY_LANGUAGE            pl_PL           // Polish in Poland
 //#define MY_LANGUAGE            pt_BR           // Portuguese in Brazil
