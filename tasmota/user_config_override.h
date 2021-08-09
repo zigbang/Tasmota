@@ -57,7 +57,10 @@
 #undef USE_DISCOVERY
 #endif
 
-#define FRIENDLY_NAME          "ZIoT Sonoff"         // [FriendlyName] Friendlyname up to 32 characters used by webpages and Alexa
+#define PROJECT                "ZIoT_Sonoff"         // PROJECT is used as the default topic delimiter
+#define FRIENDLY_NAME          "ZIGBANG"         // [FriendlyName] Friendlyname up to 32 characters used by webpages and Alexa
+#define MQTT_TOPIC             FRIENDLY_NAME "_%06X"   // [Topic] unique MQTT device topic including (part of) device MAC address
+#define MQTT_GRPTOPIC          FRIENDLY_NAME "s"        // [GroupTopic] MQTT Group topic
 
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp
