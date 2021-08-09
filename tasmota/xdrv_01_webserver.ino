@@ -50,7 +50,7 @@
 const uint16_t CHUNKED_BUFFER_SIZE = 500;                // Chunk buffer size
 
 const uint16_t HTTP_REFRESH_TIME = 2345;                 // milliseconds
-const uint16_t HTTP_RESTART_RECONNECT_TIME = 10000;      // milliseconds - Allow time for restart and wifi reconnect
+const uint16_t HTTP_RESTART_RECONNECT_TIME = 15000;      // milliseconds - Allow time for restart and wifi reconnect
 #ifdef ESP8266
 const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 24000;  // milliseconds - Allow time for uploading binary, unzip/write to final destination and wifi reconnect
 #endif  // ESP8266
@@ -356,7 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT Sonoff %s " D_BY " (주)직방</a></div>"
+  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></div>"
   "</div>"
   "</body>"
   "</html>";
@@ -1493,10 +1493,21 @@ void HandleWifiConfiguration(void) {
       TasmotaGlobal.ota_state_flag = 0;                  // No OTA
 //      TasmotaGlobal.blinks = 0;                          // Disable blinks initiated by WifiManager
 
+      String mac_address = NetworkUniqueId();
+      String mac_part = mac_address.substring(6);
+
       WebGetArg(PSTR("s1"), tmp, sizeof(tmp));   // SSID1
       SettingsUpdateText(SET_STASSID1, tmp);
       WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
       SettingsUpdateText(SET_STAPWD1, tmp);
+      WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
+      SettingsUpdateText(SET_DEVICENAME, tmp);
+      SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
+
+      sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
+      SettingsUpdateText(SET_MQTT_TOPIC, tmp);
+      sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
+      SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
         SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
