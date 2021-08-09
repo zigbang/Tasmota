@@ -539,6 +539,9 @@ void StartWebserver(int type, IPAddress ipweb)
         // register
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
+      Webserver->on(F("/info"), HTTP_GET, HandleDeviceInfo);
+      Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
+      Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -2681,6 +2684,57 @@ bool CaptivePortal(void)
 #endif  // NO_CAPTIVE_PORTAL
 
 /*********************************************************************************************/
+
+void HandleDeviceInfo(void) {
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"switch\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str());
+  WSContentEnd();
+}
+
+void HandleCertsInfo(void) {
+  if ((strlen(AmazonClientCert) == 0) || strlen(AmazonPrivateKey) == 0) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"cert\":\"%s\", \"key\":\"%s\"}}"), AmazonClientCert, AmazonPrivateKey);
+  WSContentEnd();
+}
+
+void HandleCertsConfiguration(void) {
+  if(!Webserver->hasArg(F("plain"))) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  JsonParser parser((char*) Webserver->arg("plain").c_str());
+  JsonParserObject stateObject = parser.getRootObject();
+  String cert = stateObject["cert"].getStr();
+  String key = stateObject["key"].getStr();
+
+/* TODO: 인증서 사이즈 체크 예외코드 작성
+  if(cert.length() != 256 || key.length() < 10) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+*/
+  strcpy(AmazonClientCert, cert.c_str());
+  strcpy(AmazonPrivateKey, key.c_str());
+
+  MqttDisconnect();
+  MqttInit();
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
+  WSContentEnd();
+}
 
 int WebSend(char *buffer)
 {
