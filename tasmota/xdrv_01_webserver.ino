@@ -50,7 +50,7 @@
 const uint16_t CHUNKED_BUFFER_SIZE = 500;                // Chunk buffer size
 
 const uint16_t HTTP_REFRESH_TIME = 2345;                 // milliseconds
-const uint16_t HTTP_RESTART_RECONNECT_TIME = 10000;      // milliseconds - Allow time for restart and wifi reconnect
+const uint16_t HTTP_RESTART_RECONNECT_TIME = 15000;      // milliseconds - Allow time for restart and wifi reconnect
 #ifdef ESP8266
 const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 24000;  // milliseconds - Allow time for uploading binary, unzip/write to final destination and wifi reconnect
 #endif  // ESP8266
@@ -356,7 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT Sonoff %s " D_BY " (주)직방</a></div>"
+  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></div>"
   "</div>"
   "</body>"
   "</html>";
@@ -539,6 +539,9 @@ void StartWebserver(int type, IPAddress ipweb)
         // register
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
+      Webserver->on(F("/info"), HTTP_GET, HandleDeviceInfo);
+      Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
+      Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -1493,10 +1496,21 @@ void HandleWifiConfiguration(void) {
       TasmotaGlobal.ota_state_flag = 0;                  // No OTA
 //      TasmotaGlobal.blinks = 0;                          // Disable blinks initiated by WifiManager
 
+      String mac_address = NetworkUniqueId();
+      String mac_part = mac_address.substring(6);
+
       WebGetArg(PSTR("s1"), tmp, sizeof(tmp));   // SSID1
       SettingsUpdateText(SET_STASSID1, tmp);
       WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
       SettingsUpdateText(SET_STAPWD1, tmp);
+      WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
+      SettingsUpdateText(SET_DEVICENAME, tmp);
+      SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
+
+      sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
+      SettingsUpdateText(SET_MQTT_TOPIC, tmp);
+      sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
+      SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
         SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
@@ -2670,6 +2684,57 @@ bool CaptivePortal(void)
 #endif  // NO_CAPTIVE_PORTAL
 
 /*********************************************************************************************/
+
+void HandleDeviceInfo(void) {
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"switch\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str());
+  WSContentEnd();
+}
+
+void HandleCertsInfo(void) {
+  if ((strlen(AmazonClientCert) == 0) || strlen(AmazonPrivateKey) == 0) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"cert\":\"%s\", \"key\":\"%s\"}}"), AmazonClientCert, AmazonPrivateKey);
+  WSContentEnd();
+}
+
+void HandleCertsConfiguration(void) {
+  if(!Webserver->hasArg(F("plain"))) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  JsonParser parser((char*) Webserver->arg("plain").c_str());
+  JsonParserObject stateObject = parser.getRootObject();
+  String cert = stateObject["cert"].getStr();
+  String key = stateObject["key"].getStr();
+
+/* TODO: 인증서 사이즈 체크 예외코드 작성
+  if(cert.length() != 256 || key.length() < 10) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+*/
+  strcpy(AmazonClientCert, cert.c_str());
+  strcpy(AmazonPrivateKey, key.c_str());
+
+  MqttDisconnect();
+  MqttInit();
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
+  WSContentEnd();
+}
 
 int WebSend(char *buffer)
 {
