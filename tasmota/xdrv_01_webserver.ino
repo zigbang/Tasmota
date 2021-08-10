@@ -356,8 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></div>"
-  "</div>"
+  "<table style='100%%; font-size:11px; display:block'><tbody style='display:block'><tr style='display:block'><th class=\"p\">%s</th><td class=\"q\" style='text-align:right'><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></td></tr></tbody></table>"
   "</body>"
   "</html>";
 
@@ -894,7 +893,7 @@ void WSContentStop(void)
     }
   }
   // TODO: ZIoT 버전 변경
-  WSContentSend_P(HTTP_END, TasmotaGlobal.version);
+  WSContentSend_P(HTTP_END, WiFi.macAddress().c_str(), TasmotaGlobal.version);
   WSContentEnd();
 }
 
