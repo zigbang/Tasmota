@@ -143,6 +143,7 @@ struct {
   bool module_changed;                      // Indicate module changed since last restart
   bool wifi_stay_asleep;                    // Allow sleep only incase of ESP32 BLE
   bool no_autoexec;                         // Disable autoexec
+  bool mqtt_connected = false;
 
   StateBitfield global_state;               // Global states (currently Wifi and Mqtt) (8 bits)
   uint8_t spi_enabled;                      // SPI configured

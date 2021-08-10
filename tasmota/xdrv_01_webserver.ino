@@ -1080,34 +1080,9 @@ bool HandleRootStatusRefresh(void)
     Script_Check_HTML_Setvars();
   #endif
 
-  char svalue[32];                   // Command and number parameter
-
-/* TODO: 현재 상태 표시로 활용 가능
-  if (TasmotaGlobal.devices_present) {
-    WSContentSend_P(PSTR("{t}<tr>"));
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      WSContentSend_P(HTTP_DEVICE_STATE, 36, (bitRead(TasmotaGlobal.power, 0)) ? PSTR("bold") : PSTR("normal"), 54, GetStateText(bitRead(TasmotaGlobal.power, 0)));
-      uint32_t fanspeed = GetFanspeed();
-      snprintf_P(svalue, sizeof(svalue), PSTR("%d"), fanspeed);
-      WSContentSend_P(HTTP_DEVICE_STATE, 64, (fanspeed) ? PSTR("bold") : PSTR("normal"), 54, (fanspeed) ? svalue : GetStateText(0));
-    } else {
-#endif  // USE_SONOFF_IFAN
-      uint32_t cols = WebDeviceColumns();
-      uint32_t fontsize = (cols < 5) ? 70 - (cols * 8) : 32;
-      for (uint32_t idx = 1; idx <= TasmotaGlobal.devices_present; idx++) {
-        snprintf_P(svalue, sizeof(svalue), PSTR("%d"), bitRead(TasmotaGlobal.power, idx -1));
-        WSContentSend_P(HTTP_DEVICE_STATE, 100 / cols, (bitRead(TasmotaGlobal.power, idx -1)) ? PSTR("bold") : PSTR("normal"), fontsize,
-          (cols < 5) ? GetStateText(bitRead(TasmotaGlobal.power, idx -1)) : svalue);
-        if (0 == idx % cols) { WSContentSend_P(PSTR("</tr><tr>")); }
-      }
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-  */
+  WSContentSend_P(PSTR("{t}<tr>"));
+  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스가 중지 상태입니다.");
+  WSContentSend_P(PSTR("</tr></table>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
   WSContentEnd();
 
