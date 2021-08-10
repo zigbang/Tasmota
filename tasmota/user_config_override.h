@@ -61,6 +61,7 @@
 #define FRIENDLY_NAME          "ZIGBANG"         // [FriendlyName] Friendlyname up to 32 characters used by webpages and Alexa
 #define MQTT_TOPIC             FRIENDLY_NAME "_%06X"   // [Topic] unique MQTT device topic including (part of) device MAC address
 #define MQTT_GRPTOPIC          FRIENDLY_NAME "s"        // [GroupTopic] MQTT Group topic
+#define MQTT_CLIENT_ID         FRIENDLY_NAME "_%06X"       // [MqttClient] Also fall back topic using last 6 characters of MAC address or use "DVES_%12X" for complete MAC address
 
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp

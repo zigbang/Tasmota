@@ -1496,9 +1496,6 @@ void HandleWifiConfiguration(void) {
       TasmotaGlobal.ota_state_flag = 0;                  // No OTA
 //      TasmotaGlobal.blinks = 0;                          // Disable blinks initiated by WifiManager
 
-      String mac_address = NetworkUniqueId();
-      String mac_part = mac_address.substring(6);
-
       WebGetArg(PSTR("s1"), tmp, sizeof(tmp));   // SSID1
       SettingsUpdateText(SET_STASSID1, tmp);
       WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
@@ -1506,11 +1503,6 @@ void HandleWifiConfiguration(void) {
       WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
       SettingsUpdateText(SET_DEVICENAME, tmp);
       SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
-
-      sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
-      SettingsUpdateText(SET_MQTT_TOPIC, tmp);
-      sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
-      SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
         SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
