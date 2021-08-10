@@ -290,6 +290,21 @@ void setup(void) {
 #endif
 
   SettingsLoad();
+
+  // TODO: 모듈화
+  char tmp[TOPSZ];
+
+  String mac_address = NetworkUniqueId();
+  String mac_part = mac_address.substring(6);
+
+  sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
+  SettingsUpdateText(SET_MQTT_CLIENT, tmp);
+  SettingsUpdateText(SET_MQTT_TOPIC, tmp);
+  strcpy(TasmotaGlobal.mqtt_client, tmp);
+  strcpy(TasmotaGlobal.mqtt_topic, tmp);
+  sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
+  SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
+
   SettingsDelta();
 
   OsWatchInit();
@@ -371,8 +386,6 @@ void setup(void) {
   }
   // Thehackbox inserts "release" or "commit number" before compiling using sed -i -e 's/PSTR("(%s)")/PSTR("(85cff52-%s)")/g' tasmota.ino
   snprintf_P(TasmotaGlobal.image_name, sizeof(TasmotaGlobal.image_name), PSTR("(%s)"), PSTR(CODE_IMAGE_STR));  // Results in (85cff52-tasmota) or (release-tasmota)
-  Format(TasmotaGlobal.mqtt_client, SettingsText(SET_MQTT_CLIENT), sizeof(TasmotaGlobal.mqtt_client));
-  Format(TasmotaGlobal.mqtt_topic, SettingsText(SET_MQTT_TOPIC), sizeof(TasmotaGlobal.mqtt_topic));
   if (strchr(SettingsText(SET_HOSTNAME), '%') != nullptr) {
     SettingsUpdateText(SET_HOSTNAME, WIFI_HOSTNAME);
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME), TasmotaGlobal.mqtt_topic);
