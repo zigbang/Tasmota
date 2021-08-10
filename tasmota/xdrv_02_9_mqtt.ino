@@ -23,8 +23,6 @@
 
 // #define DEBUG_DUMP_TLS    // allow dumping of TLS Flash keys
 
-#include "tasmota_cert.h"
-
 #ifdef USE_MQTT_TLS
   #include "WiFiClientSecureLightBearSSL.h"
   BearSSL::WiFiClientSecure_light *tlsClient;
