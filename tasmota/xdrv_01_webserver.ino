@@ -356,7 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<table style='100%%; font-size:11px; display:block'><tbody style='display:block'><tr style='display:block'><th class=\"p\">%s</th><td class=\"q\" style='text-align:right'><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></td></tr></tbody></table>"
+  "<table style='100%%; font-size:11px; display:block'><tbody style='display:block'><tr style='display:block'><th class=\"p\" style='color:#aaa'>%s</th><td class=\"q\" style='text-align:right'><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></td></tr></tbody></table>"
   "</body>"
   "</html>";
 
@@ -1669,6 +1669,7 @@ void HandleWifiConfiguration(void) {
     } else if (WIFI_TEST_FINISHED_BAD == Web.wifiTest) {
       WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CREDENTIALS "</h3></div>"), SettingsText(SET_STASSID1));
     }
+    WSContentSend_P(PSTR("<button style=\"display:block\" onclick=\"document.getElementById('s1').value='%s';document.getElementById('p1').value='%s';\">Test용 WiFi</button><p></p>"), DEFAULT_SSID, DEFAULT_PASS);
     // More Options Button
     WSContentSend_P(PSTR("<div id=butmod style=\"display:%s;\"></div><p><form id=butmo style=\"display:%s;\"><button type='button' onclick='hidBtns()'>" D_SHOW_MORE_OPTIONS "</button></form></p>"),
       (WIFI_TEST_FINISHED_BAD == Web.wifiTest) ? "none" : Web.initial_config ? "block" : "none", Web.initial_config ? "block" : "none"
