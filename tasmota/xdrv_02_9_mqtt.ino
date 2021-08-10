@@ -838,6 +838,7 @@ uint16_t MqttConnectCount(void) {
 
 void MqttDisconnected(int state) {
   Mqtt.connected = false;
+  TasmotaGlobal.mqtt_connected = false;
 
   Mqtt.retry_counter = Settings->mqtt_retry * Mqtt.retry_counter_delay;
   if ((Settings->mqtt_retry * Mqtt.retry_counter_delay) < 120) {
@@ -856,6 +857,7 @@ void MqttConnected(void) {
   if (Mqtt.allowed) {
     AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECTED));
     Mqtt.connected = true;
+    TasmotaGlobal.mqtt_connected = true;
     Mqtt.retry_counter = 0;
     Mqtt.retry_counter_delay = 1;
     Mqtt.connect_count++;
@@ -966,6 +968,7 @@ void MqttReconnect(void) {
 #endif  // USE_EMULATION
 
   Mqtt.connected = false;
+  TasmotaGlobal.mqtt_connected = false;
   Mqtt.retry_counter = Settings->mqtt_retry * Mqtt.retry_counter_delay;
   TasmotaGlobal.global_state.mqtt_down = 1;
 
