@@ -2690,6 +2690,8 @@ void HandleCertsConfiguration(void) {
   JsonParserObject stateObject = parser.getRootObject();
   String cert = stateObject["cert"].getStr();
   String key = stateObject["key"].getStr();
+  char* certCharType = (char*)cert.c_str();
+  char* keyCharType = (char*)key.c_str();
 
 /* TODO: 인증서 사이즈 체크 예외코드 작성
   if(cert.length() != 256 || key.length() < 10) {
@@ -2699,9 +2701,8 @@ void HandleCertsConfiguration(void) {
     return;
   }
 */
-  strcpy(AmazonClientCert, cert.c_str());
-  strcpy(AmazonPrivateKey, key.c_str());
-
+  memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+  memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
   MqttDisconnect();
   MqttInit();
 

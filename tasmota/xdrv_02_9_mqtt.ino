@@ -210,11 +210,13 @@ void MqttInit(void) {
   }
 
   if (Mqtt.mqtt_tls) {
+    if (!tlsClient) {
 #ifdef ESP32
-    tlsClient = new BearSSL::WiFiClientSecure_light(2048,2048);
+      tlsClient = new BearSSL::WiFiClientSecure_light(2048,2048);
 #else // ESP32 - ESP8266
-    tlsClient = new BearSSL::WiFiClientSecure_light(1024,1024);
+      tlsClient = new BearSSL::WiFiClientSecure_light(1024,1024);
 #endif
+    }
 
 ConvertTlsFile(0);
 ConvertTlsFile(1);
