@@ -249,7 +249,7 @@
 #define D_WIFIMANAGER_SET_ACCESSPOINT "와이파이 매니저가 AccessPoint를 설정"
 #define D_TRYING_TO_CONNECT "네트워크에 연결 중입니다. 잠시만 기다려주세요"
 
-#define D_RESTART_IN "재시작"
+#define D_RESTART_IN "위 주소로"
 #define D_SECONDS "초"
 #define D_DEVICE_WILL_RESTART "이 장치는 몇 초 후 재시작됩니다"
 #define D_BUTTON_TOGGLE "켜기/끄기"
@@ -281,7 +281,7 @@
 #define D_SERIAL_OUT "Serial Out"
 
 #define D_WIFI_PARAMETERS "기기 설정"
-#define D_SCAN_FOR_WIFI_NETWORKS "Wifi 네트워크를 검색.."
+#define D_SCAN_FOR_WIFI_NETWORKS "다른 WiFi 탐색"
 #define D_SCAN_DONE "검색 완료"
 #define D_NO_NETWORKS_FOUND "발견된 네트워크가 없습니다"
 #define D_REFRESH_TO_SCAN_AGAIN "검색 재시도"
@@ -299,8 +299,8 @@
 #define D_AP_PASSWORD_HELP "WiFi 비밀번호를 입력해주세요"
 #define D_DEVICE_NICKNAME "기기 별명"
 #define D_DEVICE_NICKNAME_HELP "기기 별명을 입력해주세요"
-#define D_SELECT_YOUR_WIFI_NETWORK "아래에서 와이파이를 선택하세요"
-#define D_SHOW_MORE_WIFI_NETWORKS "다른 와이파이 탐색"
+#define D_SELECT_YOUR_WIFI_NETWORK "아래에서 WiFi를 선택하세요"
+#define D_SHOW_MORE_WIFI_NETWORKS "다른 WiFi 탐색"
 #define D_SHOW_MORE_OPTIONS "더보기"
 #define D_CHECK_CREDENTIALS "Please, check your credentials"
 #define D_SUCCESSFUL_WIFI_CONNECTION "Successful WiFi Connection"

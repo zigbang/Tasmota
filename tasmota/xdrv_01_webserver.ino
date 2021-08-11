@@ -356,8 +356,7 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 // TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></div>"
-  "</div>"
+  "<table style='100%%; font-size:11px; display:block'><tbody style='display:block'><tr style='display:block'><th class=\"p\" style='color:#aaa'>%s</th><td class=\"q\" style='text-align:right'><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></td></tr></tbody></table>"
   "</body>"
   "</html>";
 
@@ -894,7 +893,7 @@ void WSContentStop(void)
     }
   }
   // TODO: ZIoT 버전 변경
-  WSContentSend_P(HTTP_END, TasmotaGlobal.version);
+  WSContentSend_P(HTTP_END, WiFi.macAddress().c_str(), TasmotaGlobal.version);
   WSContentEnd();
 }
 
@@ -932,6 +931,8 @@ void WebRestart(uint32_t type)
 #if (AFTER_INITIAL_WIFI_CONFIG_GO_TO_NEW_IP)
       WSContentTextCenterStart(WebColor(COL_TEXT_SUCCESS));
       WSContentSend_P(PSTR(D_SUCCESSFUL_WIFI_CONNECTION "<br><br></div><div style='text-align:center;'>" D_REDIRECTING_TO_NEW_IP "<br><br><a href='http://%_I'>%_I</a><br></div>"),(uint32_t)WiFi.localIP(),(uint32_t)WiFi.localIP());
+      WSContentSend_P(PSTR("<div id='t' style='text-align:center'></div>"));
+      WSContentSend_P(PSTR("<script>var cn=30; function counter(){if(cn>=0){eb('t').innerHTML='" D_RESTART_IN " '+cn+' " D_SECONDS " 안에 이동합니다.';cn--;setTimeout(counter, 1000);}}wl(counter);</script><br>"));
 #else
       WSContentTextCenterStart(WebColor(COL_TEXT_SUCCESS));
       WSContentSend_P(PSTR(D_SUCCESSFUL_WIFI_CONNECTION "<br><br></div><div style='text-align:center;'>" D_NOW_YOU_CAN_CLOSE_THIS_WINDOW "<br><br></div>"));
@@ -1081,34 +1082,9 @@ bool HandleRootStatusRefresh(void)
     Script_Check_HTML_Setvars();
   #endif
 
-  char svalue[32];                   // Command and number parameter
-
-/* TODO: 현재 상태 표시로 활용 가능
-  if (TasmotaGlobal.devices_present) {
-    WSContentSend_P(PSTR("{t}<tr>"));
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      WSContentSend_P(HTTP_DEVICE_STATE, 36, (bitRead(TasmotaGlobal.power, 0)) ? PSTR("bold") : PSTR("normal"), 54, GetStateText(bitRead(TasmotaGlobal.power, 0)));
-      uint32_t fanspeed = GetFanspeed();
-      snprintf_P(svalue, sizeof(svalue), PSTR("%d"), fanspeed);
-      WSContentSend_P(HTTP_DEVICE_STATE, 64, (fanspeed) ? PSTR("bold") : PSTR("normal"), 54, (fanspeed) ? svalue : GetStateText(0));
-    } else {
-#endif  // USE_SONOFF_IFAN
-      uint32_t cols = WebDeviceColumns();
-      uint32_t fontsize = (cols < 5) ? 70 - (cols * 8) : 32;
-      for (uint32_t idx = 1; idx <= TasmotaGlobal.devices_present; idx++) {
-        snprintf_P(svalue, sizeof(svalue), PSTR("%d"), bitRead(TasmotaGlobal.power, idx -1));
-        WSContentSend_P(HTTP_DEVICE_STATE, 100 / cols, (bitRead(TasmotaGlobal.power, idx -1)) ? PSTR("bold") : PSTR("normal"), fontsize,
-          (cols < 5) ? GetStateText(bitRead(TasmotaGlobal.power, idx -1)) : svalue);
-        if (0 == idx % cols) { WSContentSend_P(PSTR("</tr><tr>")); }
-      }
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-  */
+  WSContentSend_P(PSTR("{t}<tr>"));
+  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스가 중지 상태입니다.");
+  WSContentSend_P(PSTR("</tr></table>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
   WSContentEnd();
 
@@ -1496,9 +1472,6 @@ void HandleWifiConfiguration(void) {
       TasmotaGlobal.ota_state_flag = 0;                  // No OTA
 //      TasmotaGlobal.blinks = 0;                          // Disable blinks initiated by WifiManager
 
-      String mac_address = NetworkUniqueId();
-      String mac_part = mac_address.substring(6);
-
       WebGetArg(PSTR("s1"), tmp, sizeof(tmp));   // SSID1
       SettingsUpdateText(SET_STASSID1, tmp);
       WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
@@ -1506,11 +1479,6 @@ void HandleWifiConfiguration(void) {
       WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
       SettingsUpdateText(SET_DEVICENAME, tmp);
       SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
-
-      sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
-      SettingsUpdateText(SET_MQTT_TOPIC, tmp);
-      sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
-      SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
         SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
@@ -1703,6 +1671,7 @@ void HandleWifiConfiguration(void) {
     } else if (WIFI_TEST_FINISHED_BAD == Web.wifiTest) {
       WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CREDENTIALS "</h3></div>"), SettingsText(SET_STASSID1));
     }
+    WSContentSend_P(PSTR("<button style=\"display:block\" onclick=\"document.getElementById('s1').value='%s';document.getElementById('p1').value='%s';\">Test용 WiFi</button><p></p>"), DEFAULT_SSID, DEFAULT_PASS);
     // More Options Button
     WSContentSend_P(PSTR("<div id=butmod style=\"display:%s;\"></div><p><form id=butmo style=\"display:%s;\"><button type='button' onclick='hidBtns()'>" D_SHOW_MORE_OPTIONS "</button></form></p>"),
       (WIFI_TEST_FINISHED_BAD == Web.wifiTest) ? "none" : Web.initial_config ? "block" : "none", Web.initial_config ? "block" : "none"
@@ -1957,24 +1926,7 @@ void HandleInformation(void)
   WSContentSend_P(PSTR("<table style='width:100%%'><tr><th>"));
   // TODO: ZIoT 버전 변경
   WSContentSend_P(PSTR(D_PROGRAM_VERSION "}2%s%s"), TasmotaGlobal.version, TasmotaGlobal.image_name);
-  WSContentSend_P(PSTR("}1" D_BUILD_DATE_AND_TIME "}2%s"), GetBuildDateAndTime().c_str());
-  WSContentSend_P(PSTR("}1" D_CORE_AND_SDK_VERSION "}2" ARDUINO_CORE_RELEASE "/%s"), ESP.getSdkVersion());
   WSContentSend_P(PSTR("}1" D_UPTIME "}2%s"), GetUptime().c_str());
-#ifdef ESP8266
-  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d at 0x%X"), Settings->save_flag, GetSettingsAddress());
-#endif  // ESP8266
-#ifdef ESP32
-  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d"), Settings->save_flag);
-#endif  // ESP32
-  WSContentSend_P(PSTR("}1" D_BOOT_COUNT "}2%d"), Settings->bootcount);
-  WSContentSend_P(PSTR("}1" D_RESTART_REASON "}2%s"), GetResetReason().c_str());
-  uint32_t maxfn = (TasmotaGlobal.devices_present > MAX_FRIENDLYNAMES) ? MAX_FRIENDLYNAMES : TasmotaGlobal.devices_present;
-#ifdef USE_SONOFF_IFAN
-  if (IsModuleIfan()) { maxfn = 1; }
-#endif  // USE_SONOFF_IFAN
-  for (uint32_t i = 0; i < maxfn; i++) {
-    WSContentSend_P(PSTR("}1" D_FRIENDLY_NAME " %d}2%s"), i +1, SettingsText(SET_FRIENDLYNAME1 +i));
-  }
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
 #ifdef ESP32
 #ifdef USE_ETHERNET
@@ -1982,7 +1934,7 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_HOSTNAME "}2%s%s"), EthernetHostname(), (Mdns.begun) ? PSTR(".local") : "");
     WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), EthernetMacAddress().c_str());
     WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (eth)}2%_I"), (uint32_t)EthernetLocalIP());
-    WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+    WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   }
 #endif
 #endif
@@ -1999,7 +1951,7 @@ void HandleInformation(void)
     if (static_cast<uint32_t>(WiFi.localIP()) != 0) {
       WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), WiFi.macAddress().c_str());
       WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (wifi)}2%_I"), (uint32_t)WiFi.localIP());
-      WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+      WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
     }
   }
   if (!TasmotaGlobal.global_state.network_down) {
@@ -2008,11 +1960,36 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_DNS_SERVER "}2%_I"), Settings->ipv4_address[3]);
   }
   if ((WiFi.getMode() >= WIFI_AP) && (static_cast<uint32_t>(WiFi.softAPIP()) != 0)) {
-    WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+    WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
     WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), WiFi.softAPmacAddress().c_str());
     WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (AP)}2%_I"), (uint32_t)WiFi.softAPIP());
     WSContentSend_P(PSTR("}1" D_GATEWAY "}2%_I"), (uint32_t)WiFi.softAPIP());
   }
+  WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
+  WSContentSend_P(PSTR("</td></tr></table>"));
+
+  WSContentSend_P(HTTP_SCRIPT_INFO_END);
+  WSContentSendStyle();
+  // WSContentSend_P(PSTR("<fieldset><legend><b>&nbsp;Information&nbsp;</b></legend>"));
+  WSContentSend_P(PSTR("<style>td{padding:0px 5px;}</style>"
+                       "<div id='i' name='i'></div>"));
+  //   WSContentSend_P(PSTR("</fieldset>"));
+
+  // Show more
+  WSContentSend_P(PSTR("<div id=\"but2d\" style=\"display:block;\"></div><p></p><form id=\"but2\" style=\"display:block;\"><button onclick=\"if(document.getElementById('hide_context').style.display != ''){document.getElementById('hide_context').style.display = '';this.innerText = '숨기기';}else{document.getElementById('hide_context').style.display = 'none'; this.innerText = '더보기';}\" type=\"button\"/>더보기</button></form>"));
+  WSContentSend_P(PSTR("<div id=\"hide_context\" style=\"display: none;\">"));
+  WSContentSend_P("<script>function hide(){var s,o=\"");
+  WSContentSend_P(PSTR("<table style='width:100%%'><tr><th>"));
+  WSContentSend_P(PSTR(D_BUILD_DATE_AND_TIME "}2%s"), GetBuildDateAndTime().c_str());
+  WSContentSend_P(PSTR("}1" D_CORE_AND_SDK_VERSION "}2" ARDUINO_CORE_RELEASE "/%s"), ESP.getSdkVersion());
+  #ifdef ESP8266
+  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d at 0x%X"), Settings->save_flag, GetSettingsAddress());
+#endif  // ESP8266
+#ifdef ESP32
+  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d"), Settings->save_flag);
+#endif  // ESP32
+  WSContentSend_P(PSTR("}1" D_BOOT_COUNT "}2%d"), Settings->bootcount);
+  WSContentSend_P(PSTR("}1" D_RESTART_REASON "}2%s"), GetResetReason().c_str());
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     WSContentSend_P(PSTR("}1" D_MQTT_HOST "}2%s"), SettingsText(SET_MQTT_HOST));
@@ -2074,13 +2051,10 @@ void HandleInformation(void)
   WSContentSend_PD(PSTR("}1" D_FREE_MEMORY "}2%1_f kB"), &freemem);
 #endif // ESP32
   WSContentSend_P(PSTR("</td></tr></table>"));
+  WSContentSend_P("\";s=o.replace(/}1/g,\"</td></tr><tr><th>\").replace(/}2/g,\"</th><td>\");eb('hide').innerHTML=s;}wl(hide);</script>");
+  WSContentSend_P("<div id='hide' name='hide'></div>");
+  WSContentSend_P(PSTR("</div>"));
 
-  WSContentSend_P(HTTP_SCRIPT_INFO_END);
-  WSContentSendStyle();
-  // WSContentSend_P(PSTR("<fieldset><legend><b>&nbsp;Information&nbsp;</b></legend>"));
-  WSContentSend_P(PSTR("<style>td{padding:0px 5px;}</style>"
-                       "<div id='i' name='i'></div>"));
-  //   WSContentSend_P(PSTR("</fieldset>"));
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
 }
