@@ -249,7 +249,7 @@
 #define D_WIFIMANAGER_SET_ACCESSPOINT "와이파이 매니저가 AccessPoint를 설정"
 #define D_TRYING_TO_CONNECT "네트워크에 연결 중입니다. 잠시만 기다려주세요"
 
-#define D_RESTART_IN "재시작"
+#define D_RESTART_IN "위 주소로"
 #define D_SECONDS "초"
 #define D_DEVICE_WILL_RESTART "이 장치는 몇 초 후 재시작됩니다"
 #define D_BUTTON_TOGGLE "켜기/끄기"
