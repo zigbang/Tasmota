@@ -61,6 +61,57 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
 
+const char HTTP_SCRIPT_ROOT2[] PROGMEM =
+  "var rfsh=1,ft;"
+  "function la(p){"
+    "a=p||'';"
+    "clearTimeout(ft);clearTimeout(lt);"
+    "if(x!=null){x.abort();}"             // Abort if no response within 2 seconds (happens on restart 1)
+    "x=new XMLHttpRequest();"
+    "x.onreadystatechange=function(){"
+      "if(x.readyState==4&&x.status==200){"
+        "var s=x.responseText.replace(/{t}/g,\"<table style='width:100%%'>\")"
+                            ".replace(/{s}/g,\"<tr><th>\")"
+//                            ".replace(/{m}/g,\"</th><td>\")"
+                            ".replace(/{m}/g,\"</th><td style='width:20px;white-space:nowrap'>\")"  // I want a right justified column with left justified text
+                            ".replace(/{e}/g,\"</td></tr>\");"
+        "eb('l1').innerHTML=s;"
+        "if(s.indexOf(\"{loader}\") != -1){"
+        "eb('loader').style.display=\"\";"
+        "} else {eb('loader').style.display=\"none\";}"
+        "clearTimeout(ft);clearTimeout(lt);"
+        "if(rfsh){"
+          "lt=setTimeout(la,%d);"               // Settings.web_refresh
+        "}"
+      "}"
+    "};"
+    "if(rfsh){"
+      "x.open('GET','.?m=1'+a,true);"       // ?m related to Webserver->hasArg("m")
+      "x.send();"
+      "ft=setTimeout(la,20000);"               // 20s failure timeout
+    "}"
+  "}"
+  "function seva(par,ivar){"
+    "la('&sv='+ivar+'_'+par);"
+  "}"
+  "function siva(par,ivar){"
+    "rfsh=1;"
+    "la('&sv='+ivar+'_'+par);"
+    "rfsh=0;"
+  "}"
+  "function pr(f){"
+    "if(f){"
+      "clearTimeout(lt);clearTimeout(ft);"
+      "lt=setTimeout(la,%d);"
+      "rfsh=1;"
+    "}else{"
+      "clearTimeout(lt);clearTimeout(ft);"
+      "rfsh=0;"
+    "}"
+  "}"
+  ;
+
+
 #ifdef USE_UNISHOX_COMPRESSION
   #ifdef USE_JAVASCRIPT_ES6
     #include "./html_compressed/HTTP_HEADER1_ES6.h"
@@ -199,15 +250,6 @@ const char HTTP_SCRIPT_INFO_END[] PROGMEM =
   "}"
   "wl(i);";
 
-const char HTTP_SCRIPT_LOADER[] PROGMEM =
-  "<style>function _showPage(show){"
-  "if(show != 1){"
-  "var loader = $(\"div.loader\");"
-  "loader.css(\"display\",\"none\");}"
-  "else{"
-  "var loader = $(\"div.loader\");"
-  "loader.css(\"display\",\"block\");}};</style>";
-
 #ifdef USE_UNISHOX_COMPRESSION
   #include "./html_compressed/HTTP_HEAD_LAST_SCRIPT.h"
   #include "./html_compressed/HTTP_HEAD_STYLE1.h"
@@ -236,7 +278,7 @@ const char HTTP_HEAD_STYLE_SSI[] PROGMEM =
   ".si .b0{height:25%%}.si .b1{height:50%%}.si .b2{height:75%%}.si .b3{height:100%%}.o30{opacity:.3}";
 
 const char HTTP_HEAD_STYLE_LOADER[] PROGMEM =
-  ".loader{margin:auto;"
+  "#loader{margin:auto;"
   "border: 5px solid #31353c; border-radius:50%%; border-top:5px solid #ffa400; width:40px; height:40px;"
   "-webkit-animation: spin 1.4s linear infinite;"
   "animation: spin 1.4s linear infinite;}"
@@ -1067,16 +1109,15 @@ void HandleRoot(void)
 
   WSContentStart_P(PSTR(D_MAIN_MENU));
 #ifdef USE_SCRIPT_WEB_DISPLAY
-  WSContentSend_P(HTTP_SCRIPT_ROOT, Settings->web_refresh, Settings->web_refresh);
+  WSContentSend_P(HTTP_SCRIPT_ROOT2, Settings->web_refresh, Settings->web_refresh);
 #else
-  WSContentSend_P(HTTP_SCRIPT_ROOT, Settings->web_refresh);
+  WSContentSend_P(HTTP_SCRIPT_ROOT2, Settings->web_refresh);
 #endif
   WSContentSend_P(HTTP_SCRIPT_ROOT_PART2);
 
   WSContentSendStyle();
-  WSContentSend_P(HTTP_SCRIPT_LOADER);
-  WSContentSend_P("<div class=\"loader\"></div>");
-  WSContentSend_P("<br>");
+  WSContentSend_P("<div id=\"loader\"></div>");
+  WSContentSend_P("</br>");
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
 
@@ -1110,9 +1151,11 @@ bool HandleRootStatusRefresh(void)
 
   WSContentSend_P(PSTR("{t}<tr>"));
   WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스에 연결 중입니다...");
-  WSContentSend_P(PSTR("</tr></table>"));
+  WSContentSend_P(PSTR("</tr></table></br>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
-  WSContentSend_P(PSTR("<script>_showPage(%s);</script>"), TasmotaGlobal.mqtt_connected);
+  if (!TasmotaGlobal.mqtt_connected) {
+    WSContentSend_P("<div style='display:none'>{loader}</div>");
+  }
   WSContentEnd();
 
   return true;
