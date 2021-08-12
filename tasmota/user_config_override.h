@@ -56,15 +56,18 @@
 #ifndef USE_MQTT_AWS_IOT
 #define USE_MQTT_AWS_IOT
 #endif
-#ifdef USE_DISCOVERY
-#undef USE_DISCOVERY
-#endif
 
 #define PROJECT                "ZIoT_Sonoff"         // PROJECT is used as the default topic delimiter
 #define FRIENDLY_NAME          "ZIGBANG"         // [FriendlyName] Friendlyname up to 32 characters used by webpages and Alexa
 #define MQTT_TOPIC             FRIENDLY_NAME "_%06X"   // [Topic] unique MQTT device topic including (part of) device MAC address
 #define MQTT_GRPTOPIC          FRIENDLY_NAME "s"        // [GroupTopic] MQTT Group topic
 #define MQTT_CLIENT_ID         FRIENDLY_NAME "_%06X"       // [MqttClient] Also fall back topic using last 6 characters of MAC address or use "DVES_%12X" for complete MAC address
+
+#undef MDNS_ENABLED
+#define MDNS_ENABLED           true             // [SetOption55] Use mDNS (false = Disable, true = Enable)
+#define USE_DISCOVERY                            // Enable mDNS for the following services (+8k code or +23.5k code with core 2_5_x, +0.3k mem)
+#define WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
+#define MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp

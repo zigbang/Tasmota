@@ -25,7 +25,6 @@ struct {
   uint8_t begun = 0;                  // mDNS active
 } Mdns;
 
-#ifdef USE_DISCOVERY
 void StartMdns(void) {
 //  static uint8_t mdns_delayed_start = Settings->param[P_MDNS_DELAYED_START];
 
@@ -70,7 +69,6 @@ void MqttDiscoverServer(void)
 }
 #endif  // MQTT_HOST_DISCOVERY
 
-#ifdef WEBSERVER_ADVERTISE
 void MdnsAddServiceHttp(void) {
   if (1 == Mdns.begun) {
     Mdns.begun = 2;
@@ -88,8 +86,6 @@ void MdnsUpdate(void) {
   }
 }
 #endif  // ESP8266
-#endif  // WEBSERVER_ADVERTISE
-#endif  // USE_DISCOVERY
 
 /*********************************************************************************************\
  * Global network parameters
