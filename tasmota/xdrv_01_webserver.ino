@@ -2014,22 +2014,17 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_MQTT "}2" D_DISABLED));
   }
 
-#if defined(USE_EMULATION) || defined(USE_DISCOVERY)
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
-#endif  // USE_EMULATION or USE_DISCOVERY
 #ifdef USE_EMULATION
   WSContentSend_P(PSTR("}1" D_EMULATION "}2%s"), GetTextIndexed(stopic, sizeof(stopic), Settings->flag2.emulation, kEmulationOptions));
 #endif  // USE_EMULATION
-#ifdef USE_DISCOVERY
   WSContentSend_P(PSTR("}1" D_MDNS_DISCOVERY "}2%s"), (Settings->flag3.mdns_enabled) ? D_ENABLED : D_DISABLED);  // SetOption55 - Control mDNS service
   if (Settings->flag3.mdns_enabled) {  // SetOption55 - Control mDNS service
-#ifdef WEBSERVER_ADVERTISE
     WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_WEB_SERVER));
-#else
-    WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_DISABLED));
-#endif  // WEBSERVER_ADVERTISE
   }
-#endif  // USE_DISCOVERY
+  else {
+    WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_DISABLED));
+  }
 
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   WSContentSend_P(PSTR("}1" D_ESP_CHIP_ID "}2%d (%s)"), ESP_getChipId(), GetDeviceHardware().c_str());
@@ -2690,6 +2685,8 @@ void HandleCertsConfiguration(void) {
   JsonParserObject stateObject = parser.getRootObject();
   String cert = stateObject["cert"].getStr();
   String key = stateObject["key"].getStr();
+  char* certCharType = (char*)cert.c_str();
+  char* keyCharType = (char*)key.c_str();
 
 /* TODO: 인증서 사이즈 체크 예외코드 작성
   if(cert.length() != 256 || key.length() < 10) {
@@ -2699,9 +2696,8 @@ void HandleCertsConfiguration(void) {
     return;
   }
 */
-  strcpy(AmazonClientCert, cert.c_str());
-  strcpy(AmazonPrivateKey, key.c_str());
-
+  memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+  memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
   MqttDisconnect();
   MqttInit();
 
