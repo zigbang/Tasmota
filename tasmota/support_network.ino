@@ -83,6 +83,8 @@ void MdnsUpdate(void) {
     MDNS.update(); // this is basically passpacket like a webserver
    // being called in main loop so no logging
    // AddLog(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_MDNS "MDNS.update"));
+    // TODO: announce 시간 늘리기
+    MDNS.announce();
   }
 }
 #endif  // ESP8266
