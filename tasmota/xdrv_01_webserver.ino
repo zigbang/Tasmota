@@ -199,6 +199,15 @@ const char HTTP_SCRIPT_INFO_END[] PROGMEM =
   "}"
   "wl(i);";
 
+const char HTTP_SCRIPT_LOADER[] PROGMEM =
+  "<style>function _showPage(show){"
+  "if(show != 1){"
+  "var loader = $(\"div.loader\");"
+  "loader.css(\"display\",\"none\");}"
+  "else{"
+  "var loader = $(\"div.loader\");"
+  "loader.css(\"display\",\"block\");}};</style>";
+
 #ifdef USE_UNISHOX_COMPRESSION
   #include "./html_compressed/HTTP_HEAD_LAST_SCRIPT.h"
   #include "./html_compressed/HTTP_HEAD_STYLE1.h"
@@ -225,6 +234,18 @@ const char HTTP_HEAD_STYLE_SSI[] PROGMEM =
   ".si{display:inline-flex;align-items:flex-end;height:15px;padding:0}"
   ".si i{width:3px;margin-right:1px;border-radius:3px;background-color:#%06x}"
   ".si .b0{height:25%%}.si .b1{height:50%%}.si .b2{height:75%%}.si .b3{height:100%%}.o30{opacity:.3}";
+
+const char HTTP_HEAD_STYLE_LOADER[] PROGMEM =
+  ".loader{margin:auto;"
+  "border: 5px solid #31353c; border-radius:50%%; border-top:5px solid #ffa400; width:40px; height:40px;"
+  "-webkit-animation: spin 1.4s linear infinite;"
+  "animation: spin 1.4s linear infinite;}"
+  "@-webkit-keyframes spin{"
+  "0%% {-webkit-transform: rotate(0deg);}"
+  "100%% {-webkit-transform: rotate(360deg);}}"
+  "@keyframes spin{"
+  "0%% {transform:rotate(0deg);}"
+  "100%% {transform:rotate(360deg);}}";
 
 const char HTTP_HEAD_STYLE3[] PROGMEM =
   "</style>"
@@ -778,6 +799,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
       WSContentSend_P(HTTP_SCRIPT_COUNTER);
     }
   }
+  //WSContentSend_P(HTTP_SCRIPT_LOADER);
   WSContentSend_P(HTTP_HEAD_LAST_SCRIPT);
 
   WSContentSend_P(HTTP_HEAD_STYLE1, WebColor(COL_FORM), WebColor(COL_INPUT), WebColor(COL_INPUT_TEXT), WebColor(COL_INPUT),
@@ -795,6 +817,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
     _WSContentSendBuffer(false, formatP, arg);
     va_end(arg);
   }
+  WSContentSend_P(HTTP_HEAD_STYLE_LOADER);
   WSContentSend_P(HTTP_HEAD_STYLE3, WebColor(COL_TEXT),
 #ifdef FIRMWARE_MINIMAL
   WebColor(COL_TEXT_WARNING),
@@ -1051,6 +1074,9 @@ void HandleRoot(void)
   WSContentSend_P(HTTP_SCRIPT_ROOT_PART2);
 
   WSContentSendStyle();
+  WSContentSend_P(HTTP_SCRIPT_LOADER);
+  WSContentSend_P("<div class=\"loader\"></div>");
+  WSContentSend_P("<br>");
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
 
@@ -1083,9 +1109,10 @@ bool HandleRootStatusRefresh(void)
   #endif
 
   WSContentSend_P(PSTR("{t}<tr>"));
-  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스가 중지 상태입니다.");
+  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스에 연결 중입니다...");
   WSContentSend_P(PSTR("</tr></table>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
+  WSContentSend_P(PSTR("<script>_showPage(%s);</script>"), TasmotaGlobal.mqtt_connected);
   WSContentEnd();
 
   return true;
