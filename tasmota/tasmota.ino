@@ -386,8 +386,8 @@ void setup(void) {
   // Thehackbox inserts "release" or "commit number" before compiling using sed -i -e 's/PSTR("(%s)")/PSTR("(85cff52-%s)")/g' tasmota.ino
   snprintf_P(TasmotaGlobal.image_name, sizeof(TasmotaGlobal.image_name), PSTR("(%s)"), PSTR(CODE_IMAGE_STR));  // Results in (85cff52-tasmota) or (release-tasmota)
   if (strchr(SettingsText(SET_HOSTNAME), '%') != nullptr) {
-    SettingsUpdateText(SET_HOSTNAME, WIFI_HOSTNAME);
-    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME), TasmotaGlobal.mqtt_topic);
+    SettingsUpdateText(SET_HOSTNAME, SettingsText(SET_FRIENDLYNAME1));
+    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
   } else {
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
   }
