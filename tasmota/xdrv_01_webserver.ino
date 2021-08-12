@@ -278,16 +278,15 @@ const char HTTP_HEAD_STYLE_SSI[] PROGMEM =
   ".si .b0{height:25%%}.si .b1{height:50%%}.si .b2{height:75%%}.si .b3{height:100%%}.o30{opacity:.3}";
 
 const char HTTP_HEAD_STYLE_LOADER[] PROGMEM =
-  "#loader{margin:auto;"
-  "border: 5px solid #31353c; border-radius:50%%; border-top:5px solid #ffa400; width:40px; height:40px;"
-  "-webkit-animation: spin 1.4s linear infinite;"
-  "animation: spin 1.4s linear infinite;}"
-  "@-webkit-keyframes spin{"
-  "0%% {-webkit-transform: rotate(0deg);}"
-  "100%% {-webkit-transform: rotate(360deg);}}"
-  "@keyframes spin{"
-  "0%% {transform:rotate(0deg);}"
-  "100%% {transform:rotate(360deg);}}";
+"#loader, #loader:before, #loader:after {border-radius: 50%%;width: 1.5em;height: 1.5em;-webkit-animation-fill-mode: both;"
+ "animation-fill-mode: both;-webkit-animation: load7 1.8s infinite ease-in-out;animation: load7 1.5s infinite ease-in-out;}"
+"#loader {color: #ffa400;font-size: 10px;margin: auto;margin-bottom:2rem;position: relative;text-indent: -9999em;"
+"-webkit-transform: translateZ(0);-ms-transform: translateZ(0);transform: translateZ(0);-webkit-animation-delay: -0.16s;animation-delay: -0.16s;}"
+"#loader:before,#loader:after {content: '';position: absolute;top: 0;}"
+"#loader:before {left: -3.5em;-webkit-animation-delay: -0.32s;animation-delay: -0.32s;}"
+"#loader:after {left: 3.5em;}"
+"@-webkit-keyframes load7 {0%%,80%%,100%% {box-shadow: 0 2.5em 0 -1.3em;}40%% {box-shadow: 0 2.5em 0 0;}}"
+"@keyframes load7 {0%%,80%%,100%% {box-shadow: 0 2.5em 0 -1.3em;}40%% {box-shadow: 0 2.5em 0 0;}}";
 
 const char HTTP_HEAD_STYLE3[] PROGMEM =
   "</style>"
@@ -1116,7 +1115,7 @@ void HandleRoot(void)
   WSContentSend_P(HTTP_SCRIPT_ROOT_PART2);
 
   WSContentSendStyle();
-  WSContentSend_P("<div id=\"loader\"></div>");
+  WSContentSend_P("<div id=\"loader\" style='padding:0'></div>");
   WSContentSend_P("</br>");
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
@@ -1150,7 +1149,7 @@ bool HandleRootStatusRefresh(void)
   #endif
 
   WSContentSend_P(PSTR("{t}<tr>"));
-  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스에 연결 중입니다...");
+  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스에 연결중입니다..");
   WSContentSend_P(PSTR("</tr></table></br>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
   if (!TasmotaGlobal.mqtt_connected) {
