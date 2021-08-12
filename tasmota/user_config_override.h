@@ -69,6 +69,13 @@
 #define WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
 #define MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 
+#undef MODULE
+#define MODULE                 WEMOS      // [Module] Select default module from tasmota_template.h
+#undef FALLBACK_MODULE
+#define FALLBACK_MODULE        WEMOS      // [Module2] Select default module on fast reboot where USER_MODULE is user template
+#undef USER_TEMPLATE
+#define USER_TEMPLATE "{\"NAME\":\"Generic\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"FLAG\":0,\"BASE\":18}"  // [Template] Set JSON template
+
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp
 // Light theme - pre v7
