@@ -46,9 +46,7 @@
   #define USE_DISCOVERY
   #endif
 #endif  // USE_ARDUINO_OTA
-#ifdef USE_DISCOVERY
   #include <ESP8266mDNS.h>                  // MQTT, Webserver, Arduino OTA
-#endif  // USE_DISCOVERY
 //#ifdef USE_I2C
   #include <Wire.h>                         // I2C support library
 //#endif  // USE_I2C
@@ -481,13 +479,7 @@ void Scheduler(void) {
 // check LEAmDNS.h
 // MDNS.update() needs to be called in main loop
 #ifdef ESP8266                     // Not needed with esp32 mdns
-#ifdef USE_DISCOVERY
-#ifdef USE_WEBSERVER
-#ifdef WEBSERVER_ADVERTISE
   MdnsUpdate();
-#endif  // WEBSERVER_ADVERTISE
-#endif  // USE_WEBSERVER
-#endif  // USE_DISCOVERY
 #endif  // ESP8266
 
   OsWatchLoop();

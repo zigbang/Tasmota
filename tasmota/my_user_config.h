@@ -1023,10 +1023,6 @@
   #include "user_config_override.h"         // Configuration overrides for my_user_config.h
 #endif
 
-#if defined(USE_DISCOVERY) && (defined(USE_MQTT_AWS_IOT) || defined(USE_MQTT_AWS_IOT_LIGHT))
-  #error "Select either USE_DISCOVERY or USE_MQTT_AWS_IOT, mDNS takes too much code space and is not needed for AWS IoT"
-#endif
-
 #if defined(USE_RULES) && defined(USE_SCRIPT)
   #error "Select either USE_RULES or USE_SCRIPT. They can't both be used at the same time"
 #endif
