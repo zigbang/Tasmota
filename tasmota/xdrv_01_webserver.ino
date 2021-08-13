@@ -2725,7 +2725,7 @@ bool CaptivePortal(void)
 
 void HandleDeviceInfo(void) {
   WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"switch\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str());
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"%s\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str(), DEVICE_TYPE);
   WSContentEnd();
 }
 
