@@ -218,9 +218,6 @@ void MqttInit(void) {
 #endif
     }
 
-ConvertTlsFile(0);
-ConvertTlsFile(1);
-
 #ifdef USE_MQTT_AWS_IOT
     loadTlsDir();   // load key and certificate data from Flash
     if ((nullptr != AWS_IoT_Private_Key) && (nullptr != AWS_IoT_Client_Certificate)) {
@@ -1018,6 +1015,7 @@ void MqttReconnect(void) {
   MqttClient.setCallback(MqttDataHandler);
 #if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
   // re-assign private keys in case it was updated in between
+  loadTlsDir();
   if (Mqtt.mqtt_tls) {
     if ((nullptr != AWS_IoT_Private_Key) && (nullptr != AWS_IoT_Client_Certificate)) {
       tlsClient->setClientECCert(AWS_IoT_Client_Certificate,
@@ -1131,6 +1129,8 @@ void MqttReconnect(void) {
 }
 
 void MqttCheck(void) {
+  if ((nullptr == AWS_IoT_Private_Key) || (nullptr == AWS_IoT_Client_Certificate)) return;
+  
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     if (!MqttIsConnected()) {
       TasmotaGlobal.global_state.mqtt_down = 1;
