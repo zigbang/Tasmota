@@ -141,7 +141,7 @@ struct {
   bool module_changed;                      // Indicate module changed since last restart
   bool wifi_stay_asleep;                    // Allow sleep only incase of ESP32 BLE
   bool no_autoexec;                         // Disable autoexec
-  bool mqtt_connected = false;
+  bool mqtt_connected;
 
   StateBitfield global_state;               // Global states (currently Wifi and Mqtt) (8 bits)
   uint8_t spi_enabled;                      // SPI configured
@@ -385,11 +385,12 @@ void setup(void) {
   }
   // Thehackbox inserts "release" or "commit number" before compiling using sed -i -e 's/PSTR("(%s)")/PSTR("(85cff52-%s)")/g' tasmota.ino
   snprintf_P(TasmotaGlobal.image_name, sizeof(TasmotaGlobal.image_name), PSTR("(%s)"), PSTR(CODE_IMAGE_STR));  // Results in (85cff52-tasmota) or (release-tasmota)
-  if (strchr(SettingsText(SET_HOSTNAME), '%') != nullptr) {
-    SettingsUpdateText(SET_HOSTNAME, SettingsText(SET_FRIENDLYNAME1));
+  SettingsUpdateText(SET_HOSTNAME, SettingsText(SET_FRIENDLYNAME1));
+  if (!strstr(SettingsText(SET_HOSTNAME), "ZIGBANG")) { // TODO: Flash에 저장하는 Flag로 대체
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
   } else {
-    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
+    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, PSTR("%s_%s"), SettingsText(SET_HOSTNAME), mac_part.c_str());
+    SettingsUpdateText(SET_HOSTNAME, TasmotaGlobal.hostname);
   }
 
   RtcInit();

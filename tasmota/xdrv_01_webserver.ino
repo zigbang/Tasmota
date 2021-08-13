@@ -49,7 +49,7 @@
 
 const uint16_t CHUNKED_BUFFER_SIZE = 500;                // Chunk buffer size
 
-const uint16_t HTTP_REFRESH_TIME = 2345;                 // milliseconds
+const uint16_t HTTP_REFRESH_TIME = 5000;                 // milliseconds
 const uint16_t HTTP_RESTART_RECONNECT_TIME = 15000;      // milliseconds - Allow time for restart and wifi reconnect
 #ifdef ESP8266
 const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 24000;  // milliseconds - Allow time for uploading binary, unzip/write to final destination and wifi reconnect
@@ -584,7 +584,7 @@ void WebServer_on(const char * prefix, void (*func)(void), uint8_t method = HTTP
 
 void StartWebserver(int type, IPAddress ipweb)
 {
-  if (!Settings->web_refresh) { Settings->web_refresh = HTTP_REFRESH_TIME; }
+  Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
       Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
@@ -2725,7 +2725,7 @@ bool CaptivePortal(void)
 
 void HandleDeviceInfo(void) {
   WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"switch\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str());
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"%s\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str(), DEVICE_TYPE);
   WSContentEnd();
 }
 
@@ -2768,7 +2768,8 @@ void HandleCertsConfiguration(void) {
   memcpy(AmazonClientCert, certCharType, strlen(certCharType));
   memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
   MqttDisconnect();
-  MqttInit();
+  ConvertTlsFile(0);
+  ConvertTlsFile(1);
 
   WSContentBegin(200, CT_APP_JSON);
   WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
