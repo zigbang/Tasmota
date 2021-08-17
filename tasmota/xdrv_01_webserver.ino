@@ -426,21 +426,21 @@ const char HTTP_DEVICE_CONTROL[] PROGMEM = "<td style='width:%d%%'><button oncli
 const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:center;font-weight:%s;font-size:%dpx'>%s</td>";
 
 enum ButtonTitle {
-  BUTTON_RESTART, BUTTON_RESET_CONFIGURATION,
+  BUTTON_RESTART, BUTTON_RESET_CONFIGURATION, BUTTON_FACTORY_RESET,
   BUTTON_MAIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_MANAGEMENT,
   BUTTON_MODULE, BUTTON_WIFI, BUTTON_LOGGING, BUTTON_OTHER, BUTTON_TEMPLATE, BUTTON_BACKUP, BUTTON_RESTORE,
   BUTTON_CONSOLE };
 const char kButtonTitle[] PROGMEM =
-  D_RESTART "|" D_RESET_CONFIGURATION "|"
+  D_RESTART "|" D_RESET_CONFIGURATION "|" "공장 초기화" "|"
   D_MAIN_MENU "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|" D_MANAGEMENT "|"
   D_CONFIGURE_MODULE "|" D_CONFIGURE_WIFI"|" D_CONFIGURE_LOGGING "|" D_CONFIGURE_OTHER "|" D_CONFIGURE_TEMPLATE "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|"
   D_CONSOLE;
 const char kButtonAction[] PROGMEM =
-  ".|rt|"
+  ".|rt|frt|"
   ".|cn|in|up|mn|"
   "md|wi|lg|co|tp|dl|rs|"
   "cs";
-const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION;
+const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION "|" "공장 초기화 확인";
 
 enum CTypes { CT_HTML, CT_PLAIN, CT_XML, CT_STREAM, CT_APP_JSON, CT_APP_STREAM };
 const char kContentTypes[] PROGMEM = "text/html|text/plain|text/xml|text/event-stream|application/json|application/octet-stream";
@@ -603,6 +603,7 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/info"), HTTP_GET, HandleDeviceInfo);
       Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
       Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
+      Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -902,7 +903,7 @@ void WSContentButton(uint32_t title_index, bool show=true)
     title_index,
     show ? "block":"none",
     GetTextIndexed(action, sizeof(action), title_index, kButtonAction));
-  if (title_index <= BUTTON_RESET_CONFIGURATION) {
+  if (title_index <= BUTTON_FACTORY_RESET) {
     char confirm[100];
     WSContentSend_P(PSTR(" onsubmit='return confirm(\"%s\");'><button name='%s' class='button bred'>%s</button></form></p>"),
       GetTextIndexed(confirm, sizeof(confirm), title_index, kButtonConfirm),
@@ -1192,6 +1193,7 @@ void HandleConfiguration(void)
   WSContentButton(BUTTON_WIFI);
 
   WSContentSpaceButton(BUTTON_RESET_CONFIGURATION);
+  WSContentSpaceButton(BUTTON_FACTORY_RESET);
 
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
@@ -1953,6 +1955,24 @@ void HandleResetConfiguration(void)
 
   char command[CMDSZ];
   snprintf_P(command, sizeof(command), PSTR(D_CMND_RESET " 1"));
+  ExecuteWebCommand(command);
+}
+
+void HandleFactoryResetConfiguration(void)
+{
+  if (!HttpCheckPriviledgedAccess(!WifiIsInManagerMode())) { return; }
+
+  AddLog(LOG_LEVEL_DEBUG, PSTR("공장 초기화 중..."));
+
+  WSContentStart_P(PSTR("공장 초기화"), !WifiIsInManagerMode());
+  WSContentSendStyle();
+  WSContentSend_P(PSTR("<div style='text-align:center;'>" D_CONFIGURATION_RESET "</div>"));
+  WSContentSend_P(HTTP_MSG_RSTRT);
+  WSContentSpaceButton(BUTTON_MAIN);
+  WSContentStop();
+
+  char command[CMDSZ];
+  snprintf_P(command, sizeof(command), PSTR(D_CMND_RESET " 2"));
   ExecuteWebCommand(command);
 }
 
