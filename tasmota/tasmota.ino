@@ -296,12 +296,12 @@ void setup(void) {
   String mac_address = NetworkUniqueId();
   String mac_part = mac_address.substring(6);
 
-  sprintf(tmp, "%s_%s", SettingsText(SET_FRIENDLYNAME1), mac_part.c_str());
+  sprintf(tmp, "ZiotThing_%s_%s_%s", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1), mac_address.c_str());
   SettingsUpdateText(SET_MQTT_CLIENT, tmp);
   SettingsUpdateText(SET_MQTT_TOPIC, tmp);
   strcpy(TasmotaGlobal.mqtt_client, tmp);
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
-  sprintf(tmp, "%ss", SettingsText(SET_FRIENDLYNAME1));
+  sprintf(tmp, "ZiotThing_%s_%s_group", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
 
   SettingsDelta();
