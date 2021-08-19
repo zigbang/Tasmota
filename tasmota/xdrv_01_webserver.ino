@@ -605,6 +605,7 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->on(F("/lo"), HTTP_GET, HandleCognitoLogin);
+      Webserver->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -1028,6 +1029,11 @@ void HandleCognitoLogin(void)
 {
   Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=openid&redirect_uri=https://nb0pw9tdj5.execute-api.ap-northeast-2.amazonaws.com/2021-08-16/login")), true);
   WSSend(302, CT_PLAIN, "");  // Empty content inhibits Content-length header so we have to close the socket ourselves.
+}
+
+void HandleCognitoLoginCode(void)
+{
+  
 }
 
 void HandleWifiLogin(void)
