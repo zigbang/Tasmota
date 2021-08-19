@@ -60,6 +60,7 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
+#include <ESP8266WebServerSecure.h>
 
 const char HTTP_SCRIPT_ROOT2[] PROGMEM =
   "var rfsh=1,ft;"
@@ -459,6 +460,7 @@ enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED_SUCCESS
 
 DNSServer *DnsServer;
 ESP8266WebServer *Webserver;
+BearSSL::ESP8266WebServerSecure *Webserver;
 
 struct WEB {
   String chunk_buffer = "";                         // Could be max 2 * CHUNKED_BUFFER_SIZE
@@ -587,7 +589,8 @@ void StartWebserver(int type, IPAddress ipweb)
   Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
-      Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
+      //Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
+      Webserver = new ESP8266WebServerSecure(443);
       // call `Webserver->on()` on each entry
       for (uint32_t i=0; i<nitems(WebServerDispatch); i++) {
         const WebServerDispatch_t & line = WebServerDispatch[i];
