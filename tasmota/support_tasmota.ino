@@ -905,15 +905,15 @@ void PerformEverySecond(void)
     }
   }
 
-  if (TasmotaGlobal.seriallog_timer) {
-    TasmotaGlobal.seriallog_timer--;
-    if (!TasmotaGlobal.seriallog_timer) {
-      if (TasmotaGlobal.seriallog_level) {
-        AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_APPLICATION D_SERIAL_LOGGING_DISABLED));
-      }
-      TasmotaGlobal.seriallog_level = 0;
-    }
-  }
+  // if (TasmotaGlobal.seriallog_timer) {
+  //   TasmotaGlobal.seriallog_timer--;
+  //   if (!TasmotaGlobal.seriallog_timer) {
+  //     if (TasmotaGlobal.seriallog_level) {
+  //       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_APPLICATION D_SERIAL_LOGGING_DISABLED));
+  //     }
+  //     TasmotaGlobal.seriallog_level = 0;
+  //   }
+  // }
 
   if (TasmotaGlobal.syslog_timer) {  // Restore syslog level
     TasmotaGlobal.syslog_timer--;
@@ -1309,10 +1309,7 @@ void Every250mSeconds(void)
         TasmotaGlobal.ota_state_flag = 3;
       }
 #endif  // FIRMWARE_MINIMAL
-
-#ifdef USE_DISCOVERY
       StartMdns();
-#endif  // USE_DISCOVERY
 
 #ifdef USE_WEBSERVER
       if (Settings->webserver) {
@@ -1328,11 +1325,7 @@ void Every250mSeconds(void)
 #endif
 #endif  // ESP32
 
-#ifdef USE_DISCOVERY
-#ifdef WEBSERVER_ADVERTISE
         MdnsAddServiceHttp();
-#endif  // WEBSERVER_ADVERTISE
-#endif  // USE_DISCOVERY
       } else {
         StopWebserver();
       }
