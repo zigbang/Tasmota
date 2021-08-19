@@ -427,17 +427,17 @@ const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:cente
 
 enum ButtonTitle {
   BUTTON_RESTART, BUTTON_RESET_CONFIGURATION, BUTTON_FACTORY_RESET,
-  BUTTON_MAIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_MANAGEMENT,
+  BUTTON_MAIN, BUTTON_COGNITO_LOGIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_MANAGEMENT,
   BUTTON_MODULE, BUTTON_WIFI, BUTTON_LOGGING, BUTTON_OTHER, BUTTON_TEMPLATE, BUTTON_BACKUP, BUTTON_RESTORE,
   BUTTON_CONSOLE };
 const char kButtonTitle[] PROGMEM =
   D_RESTART "|" D_RESET_CONFIGURATION "|" "공장 초기화" "|"
-  D_MAIN_MENU "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|" D_MANAGEMENT "|"
+  D_MAIN_MENU "|" "로그인" "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|" D_MANAGEMENT "|"
   D_CONFIGURE_MODULE "|" D_CONFIGURE_WIFI"|" D_CONFIGURE_LOGGING "|" D_CONFIGURE_OTHER "|" D_CONFIGURE_TEMPLATE "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|"
   D_CONSOLE;
 const char kButtonAction[] PROGMEM =
   ".|rt|frt|"
-  ".|cn|in|up|mn|"
+  ".|lo|cn|in|up|mn|"
   "md|wi|lg|co|tp|dl|rs|"
   "cs";
 const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION "|" "공장 초기화 확인";
@@ -604,6 +604,7 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
       Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
+      Webserver->on(F("/lo"), HTTP_GET, HandleCognitoLogin);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -1023,6 +1024,12 @@ void WebRestart(uint32_t type)
 
 /*********************************************************************************************/
 
+void HandleCognitoLogin(void)
+{
+  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=openid&redirect_uri=https://nb0pw9tdj5.execute-api.ap-northeast-2.amazonaws.com/2021-08-16/login")), true);
+  WSSend(302, CT_PLAIN, "");  // Empty content inhibits Content-length header so we have to close the socket ourselves.
+}
+
 void HandleWifiLogin(void)
 {
   WSContentStart_P(PSTR(D_CONFIGURE_WIFI), false);  // false means show page no matter if the client has or has not credentials
@@ -1127,6 +1134,7 @@ void HandleRoot(void)
 #endif  // Not FIRMWARE_MINIMAL
 
   if (HTTP_ADMIN == Web.state) {
+    WSContentSpaceButton(BUTTON_COGNITO_LOGIN);
     WSContentSpaceButton(BUTTON_CONFIGURATION);
     WSContentButton(BUTTON_INFORMATION);
     WSContentButton(BUTTON_RESTART);
