@@ -49,8 +49,8 @@
 
 const uint16_t CHUNKED_BUFFER_SIZE = 500;                // Chunk buffer size
 
-const uint16_t HTTP_REFRESH_TIME = 2345;                 // milliseconds
-const uint16_t HTTP_RESTART_RECONNECT_TIME = 10000;      // milliseconds - Allow time for restart and wifi reconnect
+const uint16_t HTTP_REFRESH_TIME = 5000;                 // milliseconds
+const uint16_t HTTP_RESTART_RECONNECT_TIME = 15000;      // milliseconds - Allow time for restart and wifi reconnect
 #ifdef ESP8266
 const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 24000;  // milliseconds - Allow time for uploading binary, unzip/write to final destination and wifi reconnect
 #endif  // ESP8266
@@ -60,6 +60,57 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
+
+const char HTTP_SCRIPT_ROOT2[] PROGMEM =
+  "var rfsh=1,ft;"
+  "function la(p){"
+    "a=p||'';"
+    "clearTimeout(ft);clearTimeout(lt);"
+    "if(x!=null){x.abort();}"             // Abort if no response within 2 seconds (happens on restart 1)
+    "x=new XMLHttpRequest();"
+    "x.onreadystatechange=function(){"
+      "if(x.readyState==4&&x.status==200){"
+        "var s=x.responseText.replace(/{t}/g,\"<table style='width:100%%'>\")"
+                            ".replace(/{s}/g,\"<tr><th>\")"
+//                            ".replace(/{m}/g,\"</th><td>\")"
+                            ".replace(/{m}/g,\"</th><td style='width:20px;white-space:nowrap'>\")"  // I want a right justified column with left justified text
+                            ".replace(/{e}/g,\"</td></tr>\");"
+        "eb('l1').innerHTML=s;"
+        "if(s.indexOf(\"{loader}\") != -1){"
+        "eb('loader').style.display=\"\";"
+        "} else {eb('loader').style.display=\"none\";}"
+        "clearTimeout(ft);clearTimeout(lt);"
+        "if(rfsh){"
+          "lt=setTimeout(la,%d);"               // Settings.web_refresh
+        "}"
+      "}"
+    "};"
+    "if(rfsh){"
+      "x.open('GET','.?m=1'+a,true);"       // ?m related to Webserver->hasArg("m")
+      "x.send();"
+      "ft=setTimeout(la,20000);"               // 20s failure timeout
+    "}"
+  "}"
+  "function seva(par,ivar){"
+    "la('&sv='+ivar+'_'+par);"
+  "}"
+  "function siva(par,ivar){"
+    "rfsh=1;"
+    "la('&sv='+ivar+'_'+par);"
+    "rfsh=0;"
+  "}"
+  "function pr(f){"
+    "if(f){"
+      "clearTimeout(lt);clearTimeout(ft);"
+      "lt=setTimeout(la,%d);"
+      "rfsh=1;"
+    "}else{"
+      "clearTimeout(lt);clearTimeout(ft);"
+      "rfsh=0;"
+    "}"
+  "}"
+  ;
+
 
 #ifdef USE_UNISHOX_COMPRESSION
   #ifdef USE_JAVASCRIPT_ES6
@@ -226,6 +277,17 @@ const char HTTP_HEAD_STYLE_SSI[] PROGMEM =
   ".si i{width:3px;margin-right:1px;border-radius:3px;background-color:#%06x}"
   ".si .b0{height:25%%}.si .b1{height:50%%}.si .b2{height:75%%}.si .b3{height:100%%}.o30{opacity:.3}";
 
+const char HTTP_HEAD_STYLE_LOADER[] PROGMEM =
+"#loader, #loader:before, #loader:after {border-radius: 50%%;width: 1.5em;height: 1.5em;-webkit-animation-fill-mode: both;"
+ "animation-fill-mode: both;-webkit-animation: load7 1.8s infinite ease-in-out;animation: load7 1.5s infinite ease-in-out;}"
+"#loader {color: #ffa400;font-size: 10px;margin: auto;margin-bottom:2rem;position: relative;text-indent: -9999em;"
+"-webkit-transform: translateZ(0);-ms-transform: translateZ(0);transform: translateZ(0);-webkit-animation-delay: -0.16s;animation-delay: -0.16s;}"
+"#loader:before,#loader:after {content: '';position: absolute;top: 0;}"
+"#loader:before {left: -3.5em;-webkit-animation-delay: -0.32s;animation-delay: -0.32s;}"
+"#loader:after {left: 3.5em;}"
+"@-webkit-keyframes load7 {0%%,80%%,100%% {box-shadow: 0 2.5em 0 -1.3em;}40%% {box-shadow: 0 2.5em 0 0;}}"
+"@keyframes load7 {0%%,80%%,100%% {box-shadow: 0 2.5em 0 -1.3em;}40%% {box-shadow: 0 2.5em 0 0;}}";
+
 const char HTTP_HEAD_STYLE3[] PROGMEM =
   "</style>"
 
@@ -354,10 +416,9 @@ const char HTTP_TABLE100[] PROGMEM =
 
 const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
-
+// TODO: 최종 리포지토리로 링크 변경
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
-  "</div>"
+  "<table style='100%%; font-size:11px; display:block'><tbody style='display:block'><tr style='display:block'><th class=\"p\" style='color:#aaa'>%s</th><td class=\"q\" style='text-align:right'><a href='https://github.com/seojinwoo/ZiotTasmota' target='_blank' style='color:#aaa;'>ZIoT %s " D_BY " (주)직방</a></td></tr></tbody></table>"
   "</body>"
   "</html>";
 
@@ -365,21 +426,21 @@ const char HTTP_DEVICE_CONTROL[] PROGMEM = "<td style='width:%d%%'><button oncli
 const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:center;font-weight:%s;font-size:%dpx'>%s</td>";
 
 enum ButtonTitle {
-  BUTTON_RESTART, BUTTON_RESET_CONFIGURATION,
+  BUTTON_RESTART, BUTTON_RESET_CONFIGURATION, BUTTON_FACTORY_RESET,
   BUTTON_MAIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_MANAGEMENT,
   BUTTON_MODULE, BUTTON_WIFI, BUTTON_LOGGING, BUTTON_OTHER, BUTTON_TEMPLATE, BUTTON_BACKUP, BUTTON_RESTORE,
   BUTTON_CONSOLE };
 const char kButtonTitle[] PROGMEM =
-  D_RESTART "|" D_RESET_CONFIGURATION "|"
+  D_RESTART "|" D_RESET_CONFIGURATION "|" "공장 초기화" "|"
   D_MAIN_MENU "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|" D_MANAGEMENT "|"
   D_CONFIGURE_MODULE "|" D_CONFIGURE_WIFI"|" D_CONFIGURE_LOGGING "|" D_CONFIGURE_OTHER "|" D_CONFIGURE_TEMPLATE "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|"
   D_CONSOLE;
 const char kButtonAction[] PROGMEM =
-  ".|rt|"
+  ".|rt|frt|"
   ".|cn|in|up|mn|"
   "md|wi|lg|co|tp|dl|rs|"
   "cs";
-const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION;
+const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION "|" "공장 초기화 확인";
 
 enum CTypes { CT_HTML, CT_PLAIN, CT_XML, CT_STREAM, CT_APP_JSON, CT_APP_STREAM };
 const char kContentTypes[] PROGMEM = "text/html|text/plain|text/xml|text/event-stream|application/json|application/octet-stream";
@@ -499,23 +560,13 @@ typedef struct WebServerDispatch_t {
 
 const WebServerDispatch_t WebServerDispatch[] PROGMEM = {
   { "",   HTTP_ANY, HandleRoot },
-  { "up", HTTP_ANY, HandleUpgradeFirmware },
-  { "u1", HTTP_ANY, HandleUpgradeFirmwareStart },   // OTA
   { "u2", HTTP_OPTIONS, HandlePreflightRequest },
-  { "u3", HTTP_ANY, HandleUploadDone },
   { "mn", HTTP_GET, HandleManagement },
-  { "cs", HTTP_GET, HandleConsole },
   { "cs", HTTP_OPTIONS, HandlePreflightRequest },
   { "cm", HTTP_ANY, HandleHttpCommand },
 #ifndef FIRMWARE_MINIMAL
   { "cn", HTTP_ANY, HandleConfiguration },
-  { "md", HTTP_ANY, HandleModuleConfiguration },
   { "wi", HTTP_ANY, HandleWifiConfiguration },
-  { "lg", HTTP_ANY, HandleLoggingConfiguration },
-  { "tp", HTTP_ANY, HandleTemplateConfiguration },
-  { "co", HTTP_ANY, HandleOtherConfiguration },
-  { "dl", HTTP_ANY, HandleBackupConfiguration },
-  { "rs", HTTP_ANY, HandleRestoreConfiguration },
   { "rt", HTTP_ANY, HandleResetConfiguration },
   { "in", HTTP_ANY, HandleInformation },
 #endif  // Not FIRMWARE_MINIMAL
@@ -533,7 +584,7 @@ void WebServer_on(const char * prefix, void (*func)(void), uint8_t method = HTTP
 
 void StartWebserver(int type, IPAddress ipweb)
 {
-  if (!Settings->web_refresh) { Settings->web_refresh = HTTP_REFRESH_TIME; }
+  Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
       Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
@@ -549,9 +600,12 @@ void StartWebserver(int type, IPAddress ipweb)
         // register
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
+      Webserver->on(F("/info"), HTTP_GET, HandleDeviceInfo);
+      Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
+      Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
+      Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
-      Webserver->on("/u2", HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
       XdrvCall(FUNC_WEB_ADD_HANDLER);
       XsnsCall(FUNC_WEB_ADD_HANDLER);
@@ -660,6 +714,7 @@ void HttpHeaderCors(void)
 void WSHeaderSend(void)
 {
   char server[32];
+  // TODO: ZIoT 버전 변경
   snprintf_P(server, sizeof(server), PSTR("Tasmota/%s (%s)"), TasmotaGlobal.version, GetDeviceHardware().c_str());
   Webserver->sendHeader(F("Server"), server);
   Webserver->sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
@@ -786,6 +841,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
       WSContentSend_P(HTTP_SCRIPT_COUNTER);
     }
   }
+  //WSContentSend_P(HTTP_SCRIPT_LOADER);
   WSContentSend_P(HTTP_HEAD_LAST_SCRIPT);
 
   WSContentSend_P(HTTP_HEAD_STYLE1, WebColor(COL_FORM), WebColor(COL_INPUT), WebColor(COL_INPUT_TEXT), WebColor(COL_INPUT),
@@ -803,12 +859,13 @@ void WSContentSendStyle_P(const char* formatP, ...)
     _WSContentSendBuffer(false, formatP, arg);
     va_end(arg);
   }
+  WSContentSend_P(HTTP_HEAD_STYLE_LOADER);
   WSContentSend_P(HTTP_HEAD_STYLE3, WebColor(COL_TEXT),
 #ifdef FIRMWARE_MINIMAL
   WebColor(COL_TEXT_WARNING),
 #endif
   WebColor(COL_TITLE),
-  (Web.initial_config) ? "" : ModuleName().c_str(), SettingsText(SET_DEVICENAME));
+  "", SettingsText(SET_DEVICENAME));
 
   // SetOption53 - Show hostname and IP address in GUI main menu
 #if (RESTART_AFTER_INITIAL_WIFI_CONFIG)
@@ -846,7 +903,7 @@ void WSContentButton(uint32_t title_index, bool show=true)
     title_index,
     show ? "block":"none",
     GetTextIndexed(action, sizeof(action), title_index, kButtonAction));
-  if (title_index <= BUTTON_RESET_CONFIGURATION) {
+  if (title_index <= BUTTON_FACTORY_RESET) {
     char confirm[100];
     WSContentSend_P(PSTR(" onsubmit='return confirm(\"%s\");'><button name='%s' class='button bred'>%s</button></form></p>"),
       GetTextIndexed(confirm, sizeof(confirm), title_index, kButtonConfirm),
@@ -900,7 +957,8 @@ void WSContentStop(void)
       WSContentSend_P(HTTP_COUNTER);
     }
   }
-  WSContentSend_P(HTTP_END, TasmotaGlobal.version);
+  // TODO: ZIoT 버전 변경
+  WSContentSend_P(HTTP_END, WiFi.macAddress().c_str(), TasmotaGlobal.version);
   WSContentEnd();
 }
 
@@ -938,6 +996,8 @@ void WebRestart(uint32_t type)
 #if (AFTER_INITIAL_WIFI_CONFIG_GO_TO_NEW_IP)
       WSContentTextCenterStart(WebColor(COL_TEXT_SUCCESS));
       WSContentSend_P(PSTR(D_SUCCESSFUL_WIFI_CONNECTION "<br><br></div><div style='text-align:center;'>" D_REDIRECTING_TO_NEW_IP "<br><br><a href='http://%_I'>%_I</a><br></div>"),(uint32_t)WiFi.localIP(),(uint32_t)WiFi.localIP());
+      WSContentSend_P(PSTR("<div id='t' style='text-align:center'></div>"));
+      WSContentSend_P(PSTR("<script>var cn=30; function counter(){if(cn>=0){eb('t').innerHTML='" D_RESTART_IN " '+cn+' " D_SECONDS " 안에 이동합니다.';cn--;setTimeout(counter, 1000);}}wl(counter);</script><br>"));
 #else
       WSContentTextCenterStart(WebColor(COL_TEXT_SUCCESS));
       WSContentSend_P(PSTR(D_SUCCESSFUL_WIFI_CONNECTION "<br><br></div><div style='text-align:center;'>" D_NOW_YOU_CAN_CLOSE_THIS_WINDOW "<br><br></div>"));
@@ -1028,20 +1088,13 @@ void HandleRoot(void)
 
   if (WifiIsInManagerMode()) {
 #ifndef FIRMWARE_MINIMAL
-    if (strlen(SettingsText(SET_WEBPWD)) && !(Webserver->hasArg(F("USER1"))) && !(Webserver->hasArg(F("PASS1"))) && HTTP_MANAGER_RESET_ONLY != Web.state) {
-      HandleWifiLogin();
-    } else {
       if (!strlen(SettingsText(SET_WEBPWD)) || (((Webserver->arg(F("USER1")) == WEB_USERNAME ) && (Webserver->arg(F("PASS1")) == SettingsText(SET_WEBPWD) )) || HTTP_MANAGER_RESET_ONLY == Web.state)) {
         if (!Web.initial_config) {
           Web.initial_config = !strlen(SettingsText(SET_STASSID1));
           if (Web.initial_config) { AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP "Blank Device - Initial Configuration")); }
         }
         HandleWifiConfiguration();
-      } else {
-        // wrong user and pass
-        HandleWifiLogin();
       }
-    }
 #endif  // Not FIRMWARE_MINIMAL
     return;
   }
@@ -1056,168 +1109,17 @@ void HandleRoot(void)
 
   WSContentStart_P(PSTR(D_MAIN_MENU));
 #ifdef USE_SCRIPT_WEB_DISPLAY
-  WSContentSend_P(HTTP_SCRIPT_ROOT, Settings->web_refresh, Settings->web_refresh);
+  WSContentSend_P(HTTP_SCRIPT_ROOT2, Settings->web_refresh, Settings->web_refresh);
 #else
-  WSContentSend_P(HTTP_SCRIPT_ROOT, Settings->web_refresh);
+  WSContentSend_P(HTTP_SCRIPT_ROOT2, Settings->web_refresh);
 #endif
   WSContentSend_P(HTTP_SCRIPT_ROOT_PART2);
 
   WSContentSendStyle();
+  WSContentSend_P("<div id=\"loader\" style='padding:0'></div>");
+  WSContentSend_P("</br>");
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
-  if (TasmotaGlobal.devices_present) {
-#ifdef USE_LIGHT
-    if (TasmotaGlobal.light_type) {
-      uint8_t light_subtype = TasmotaGlobal.light_type &7;
-      if (!Settings->flag3.pwm_multi_channels) {  // SetOption68 0 - Enable multi-channels PWM instead of Color PWM
-        bool split_white = ((LST_RGBW <= light_subtype) && (TasmotaGlobal.devices_present > 1));  // Only on RGBW or RGBCW and SetOption37 128
-
-        if ((LST_COLDWARM == light_subtype) || ((LST_RGBCW == light_subtype) && !split_white)) {
-          WebSliderColdWarm();
-        }
-
-        if (light_subtype > 2) {  // No W or CW
-          uint16_t hue;
-          uint8_t sat;
-          LightGetHSB(&hue, &sat, nullptr);
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Hue
-            PSTR("b"),             // b - Unique HTML id
-            PSTR("#800"), PSTR("#f00 5%,#ff0 20%,#0f0 35%,#0ff 50%,#00f 65%,#f0f 80%,#f00 95%,#800"),  // Hue colors
-            2,               // sl2 - Unique range HTML id - Used as source for Saturation end color
-            1, 359,          // Range valid Hue
-            hue,
-            'h', 0);         // h0 - Value id
-
-          uint8_t dcolor = changeUIntScale(Settings->light_dimmer, 0, 100, 0, 255);
-          char scolor[8];
-          snprintf_P(scolor, sizeof(scolor), PSTR("#%02X%02X%02X"), dcolor, dcolor, dcolor);  // Saturation start color from Black to White
-          uint8_t red, green, blue;
-          HsToRgb(hue, 255, &red, &green, &blue);
-          snprintf_P(stemp, sizeof(stemp), PSTR("#%02X%02X%02X"), red, green, blue);  // Saturation end color
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Saturation
-            PSTR("s"),             // s - Unique HTML id related to eb('s').style.background='linear-gradient(to right,rgb('+sl+'%%,'+sl+'%%,'+sl+'%%),hsl('+eb('sl2').value+',100%%,50%%))';
-            scolor, stemp,   // Brightness to max current color
-            3,               // sl3 - Unique range HTML id - Not used
-            0, 100,          // Range 0 to 100%
-            changeUIntScale(sat, 0, 255, 0, 100),
-            'n', 0);         // n0 - Value id
-        }
-
-        WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Brightness - Black to White
-          PSTR("c"),               // c - Unique HTML id
-          PSTR("#000"), PSTR("#fff"),    // Black to White
-          4,                 // sl4 - Unique range HTML id - Used as source for Saturation begin color
-          Settings->flag3.slider_dimmer_stay_on, 100,  // Range 0/1 to 100% (SetOption77 - Do not power off if slider moved to far left)
-          Settings->light_dimmer,
-          'd', 0);           // d0 - Value id is related to lc("d0", value) and WebGetArg("d0", tmp, sizeof(tmp));
-
-        if (split_white) {   // SetOption37 128
-          if (LST_RGBCW == light_subtype) {
-            WebSliderColdWarm();
-          }
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // White brightness - Black to White
-            PSTR("f"),             // f - Unique HTML id
-            PSTR("#000"), PSTR("#fff"),  // Black to White
-            5,               // sl5 - Unique range HTML id - Not used
-            Settings->flag3.slider_dimmer_stay_on, 100,  // Range 0/1 to 100% (SetOption77 - Do not power off if slider moved to far left)
-            LightGetDimmer(2),
-            'w', 0);         // w0 - Value id is related to lc("w0", value) and WebGetArg("w0", tmp, sizeof(tmp));
-        }
-      } else {  // Settings->flag3.pwm_multi_channels - SetOption68 1 - Enable multi-channels PWM instead of Color PWM
-        uint32_t pwm_channels = light_subtype > LST_MAX ? LST_MAX : light_subtype;
-        stemp[0] = 'e'; stemp[1] = '0'; stemp[2] = '\0';  // d0
-        for (uint32_t i = 0; i < pwm_channels; i++) {
-          stemp[1]++;        // e1 to e5 - Make unique ids
-
-          WSContentSend_P(HTTP_MSG_SLIDER_GRADIENT,  // Channel brightness - Black to White
-            stemp,           // e1 to e5 - Unique HTML id
-            PSTR("#000"), PSTR("#fff"),  // Black to White
-            i+1,             // sl1 to sl5 - Unique range HTML id - Not used
-            1, 100,          // Range 1 to 100%
-            changeUIntScale(Settings->light_color[i], 0, 255, 0, 100),
-            'e', i+1);       // e1 to e5 - Value id
-        }
-      }  // Settings->flag3.pwm_multi_channels
-    }
-#endif // USE_LIGHT
-#ifdef USE_SHUTTER
-    if (Settings->flag3.shutter_mode) {  // SetOption80 - Enable shutter support
-      for (uint32_t i = 0; i < TasmotaGlobal.shutters_present; i++) {
-        WSContentSend_P(HTTP_MSG_SLIDER_SHUTTER, Settings->shutter_position[i], i+1);
-      }
-    }
-#endif  // USE_SHUTTER
-    WSContentSend_P(HTTP_TABLE100);
-    WSContentSend_P(PSTR("<tr>"));
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      WSContentSend_P(HTTP_DEVICE_CONTROL, 36, 1,
-        (strlen(SettingsText(SET_BUTTON1))) ? SettingsText(SET_BUTTON1) : PSTR(D_BUTTON_TOGGLE),
-        "");
-      for (uint32_t i = 0; i < MaxFanspeed(); i++) {
-        snprintf_P(stemp, sizeof(stemp), PSTR("%d"), i);
-        WSContentSend_P(HTTP_DEVICE_CONTROL, 16, i +2,
-          (strlen(SettingsText(SET_BUTTON2 + i))) ? SettingsText(SET_BUTTON2 + i) : stemp,
-          "");
-      }
-    } else {
-#endif  // USE_SONOFF_IFAN
-      uint32_t cols = WebDeviceColumns();
-      for (uint32_t idx = 1; idx <= TasmotaGlobal.devices_present; idx++) {
-        bool set_button = ((idx <= MAX_BUTTON_TEXT) && strlen(SettingsText(SET_BUTTON1 + idx -1)));
-#ifdef USE_SHUTTER
-        int32_t ShutterWebButton;
-        if (ShutterWebButton = IsShutterWebButton(idx)) {
-          WSContentSend_P(HTTP_DEVICE_CONTROL, 100 / cols, idx,
-            (set_button) ? SettingsText(SET_BUTTON1 + idx -1) : ((Settings->shutter_options[abs(ShutterWebButton)-1] & 2) /* is locked */ ? "-" : ((Settings->shutter_options[abs(ShutterWebButton)-1] & 8) /* invert web buttons */ ? ((ShutterWebButton>0) ? "&#9660;" : "&#9650;") : ((ShutterWebButton>0) ? "&#9650;" : "&#9660;"))),
-            "");
-        } else {
-#endif  // USE_SHUTTER
-          snprintf_P(stemp, sizeof(stemp), PSTR(" %d"), idx);
-          WSContentSend_P(HTTP_DEVICE_CONTROL, 100 / cols, idx,
-            (set_button) ? SettingsText(SET_BUTTON1 + idx -1) : (cols < 5) ? PSTR(D_BUTTON_TOGGLE) : "",
-            (set_button) ? "" : (TasmotaGlobal.devices_present > 1) ? stemp : "");
-#ifdef USE_SHUTTER
-        }
-#endif  // USE_SHUTTER
-        if (0 == idx % cols) { WSContentSend_P(PSTR("</tr><tr>")); }
-      }
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-#ifdef USE_TUYA_MCU
-  if (IsModuleTuya()) {
-    if (AsModuleTuyaMS()) {
-      WSContentSend_P(HTTP_TABLE100);
-      WSContentSend_P(PSTR("<tr><div></div>"));
-      snprintf_P(stemp, sizeof(stemp), PSTR("" D_JSON_IRHVAC_MODE ""));
-      WSContentSend_P(HTTP_DEVICE_CONTROL, 26, TasmotaGlobal.devices_present + 1,
-        (strlen(SettingsText(SET_BUTTON1 + TasmotaGlobal.devices_present))) ? SettingsText(SET_BUTTON1 + TasmotaGlobal.devices_present) : stemp, "");
-      WSContentSend_P(PSTR("</tr></table>"));
-    }
-  }
-#endif  // USE_TUYA_MCU
-#ifdef USE_SONOFF_RF
-  if (SONOFF_BRIDGE == TasmotaGlobal.module_type) {
-    WSContentSend_P(HTTP_TABLE100);
-    WSContentSend_P(PSTR("<tr>"));
-    uint32_t idx = 0;
-    for (uint32_t i = 0; i < 4; i++) {
-      if (idx > 0) { WSContentSend_P(PSTR("</tr><tr>")); }
-      for (uint32_t j = 0; j < 4; j++) {
-        idx++;
-        snprintf_P(stemp, sizeof(stemp), PSTR("%d"), idx);
-        WSContentSend_P(PSTR("<td style='width:25%%'><button onclick='la(\"&k=%d\");'>%s</button></td>"), idx,  // &k is related to WebGetArg("k", tmp, sizeof(tmp));
-          (strlen(SettingsText(SET_BUTTON1 + idx -1))) ? SettingsText(SET_BUTTON1 + idx -1) : stemp);
-      }
-    }
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
-#endif  // USE_SONOFF_RF
 
 #ifndef FIRMWARE_MINIMAL
   XdrvCall(FUNC_WEB_ADD_MAIN_BUTTON);
@@ -1225,19 +1127,8 @@ void HandleRoot(void)
 #endif  // Not FIRMWARE_MINIMAL
 
   if (HTTP_ADMIN == Web.state) {
-#ifdef FIRMWARE_MINIMAL
-    WSContentSpaceButton(BUTTON_FIRMWARE_UPGRADE);
-    WSContentButton(BUTTON_CONSOLE);
-#else
     WSContentSpaceButton(BUTTON_CONFIGURATION);
     WSContentButton(BUTTON_INFORMATION);
-    WSContentButton(BUTTON_FIRMWARE_UPGRADE);
-    if (!WebUseManagementSubmenu()) {
-      WSContentButton(BUTTON_CONSOLE);
-    } else {
-      WSContentButton(BUTTON_MANAGEMENT);
-    }
-#endif  // Not FIRMWARE_MINIMAL
     WSContentButton(BUTTON_RESTART);
   }
   WSContentStop();
@@ -1258,159 +1149,13 @@ bool HandleRootStatusRefresh(void)
     Script_Check_HTML_Setvars();
   #endif
 
-  char tmp[8];                       // WebGetArg numbers only
-  char svalue[32];                   // Command and number parameter
-  char webindex[5];                  // WebGetArg name
-
-  WebGetArg(PSTR("o"), tmp, sizeof(tmp));  // 1 - 16 Device number for button Toggle or Fanspeed
-  if (strlen(tmp)) {
-    ShowWebSource(SRC_WEBGUI);
-    uint32_t device = atoi(tmp);
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      if (device < 2) {
-        ExecuteCommandPower(1, POWER_TOGGLE, SRC_IGNORE);
-      } else {
-        snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_FANSPEED " %d"), device -2);
-        ExecuteCommand(svalue, SRC_WEBGUI);
-      }
-    } else {
-#endif  // USE_SONOFF_IFAN
-#ifdef USE_TUYA_MCU
-    if (IsModuleTuya()) {
-      if (device <= TasmotaGlobal.devices_present) {
-        ExecuteCommandPower(device, POWER_TOGGLE, SRC_IGNORE);
-      } else {
-        if (AsModuleTuyaMS() && device == TasmotaGlobal.devices_present + 1) {
-          uint8_t dpId = TuyaGetDpId(TUYA_MCU_FUNC_MODESET);
-          snprintf_P(svalue, sizeof(svalue), PSTR("Tuyasend4 %d,%d"), dpId, !TuyaModeSet());
-          ExecuteCommand(svalue, SRC_WEBGUI);
-        }
-      }
-    } else {
-#endif  // USE_TUYA_MCU
-#ifdef USE_SHUTTER
-      int32_t ShutterWebButton;
-      if (ShutterWebButton = IsShutterWebButton(device)) {
-        snprintf_P(svalue, sizeof(svalue), PSTR("ShutterPosition%d %s"), abs(ShutterWebButton), (ShutterWebButton>0) ? PSTR(D_CMND_SHUTTER_STOPOPEN) : PSTR(D_CMND_SHUTTER_STOPCLOSE));
-        ExecuteWebCommand(svalue);
-      } else {
-#endif  // USE_SHUTTER
-        ExecuteCommandPower(device, POWER_TOGGLE, SRC_IGNORE);
-#ifdef USE_SHUTTER
-      }
-#endif  // USE_SHUTTER
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-#ifdef USE_TUYA_MCU
-    }
-#endif  // USE_TUYA_MCU
-  }
-#ifdef USE_LIGHT
-  WebGetArg(PSTR("d0"), tmp, sizeof(tmp));  // 0 - 100 Dimmer value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_DIMMER " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("w0"), tmp, sizeof(tmp));  // 0 - 100 White value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_WHITE " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  uint32_t light_device = LightDevice();  // Channel number offset
-  uint32_t pwm_channels = (TasmotaGlobal.light_type & 7) > LST_MAX ? LST_MAX : (TasmotaGlobal.light_type & 7);
-  for (uint32_t j = 0; j < pwm_channels; j++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("e%d"), j +1);
-    WebGetArg(webindex, tmp, sizeof(tmp));  // 0 - 100 percent
-    if (strlen(tmp)) {
-      snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_CHANNEL "%d %s"), j +light_device, tmp);
-      ExecuteWebCommand(svalue);
-    }
-  }
-  WebGetArg(PSTR("t0"), tmp, sizeof(tmp));  // 153 - 500 Color temperature
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_COLORTEMPERATURE " %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("h0"), tmp, sizeof(tmp));  // 0 - 359 Hue value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_HSBCOLOR  "1 %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("n0"), tmp, sizeof(tmp));  // 0 - 99 Saturation value
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_HSBCOLOR  "2 %s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-#endif  // USE_LIGHT
-#ifdef USE_SHUTTER
-  for (uint32_t j = 1; j <= TasmotaGlobal.shutters_present; j++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("u%d"), j);
-    WebGetArg(webindex, tmp, sizeof(tmp));  // 0 - 100 percent
-    if (strlen(tmp)) {
-      snprintf_P(svalue, sizeof(svalue), PSTR("ShutterPosition%d %s"), j, tmp);
-      ExecuteWebCommand(svalue);
-    }
-  }
-#endif  // USE_SHUTTER
-#ifdef USE_SONOFF_RF
-  WebGetArg(PSTR("k"), tmp, sizeof(tmp));  // 1 - 16 Pre defined RF keys
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR(D_CMND_RFKEY "%s"), tmp);
-    ExecuteWebCommand(svalue);
-  }
-#endif  // USE_SONOFF_RF
-#ifdef USE_ZIGBEE
-  WebGetArg(PSTR("zbj"), tmp, sizeof(tmp));
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR("ZbPermitJoin"));
-    ExecuteWebCommand(svalue);
-  }
-  WebGetArg(PSTR("zbr"), tmp, sizeof(tmp));
-  if (strlen(tmp)) {
-    snprintf_P(svalue, sizeof(svalue), PSTR("ZbMap"));
-    ExecuteWebCommand(svalue);
-  }
-#endif // USE_ZIGBEE
-
-#ifdef USE_WEB_SSE
-  WSContentBegin(200, CT_STREAM);
-  WSContentSend_P(PSTR("data: "));
-#else
-  WSContentBegin(200, CT_HTML);
-#endif  // USE_WEB_SSE
-  WSContentSend_P(PSTR("{t}"));
-  XsnsCall(FUNC_WEB_SENSOR);
-  XdrvCall(FUNC_WEB_SENSOR);
-
-  WSContentSend_P(PSTR("</table>"));
-
-  if (TasmotaGlobal.devices_present) {
-    WSContentSend_P(PSTR("{t}<tr>"));
-#ifdef USE_SONOFF_IFAN
-    if (IsModuleIfan()) {
-      WSContentSend_P(HTTP_DEVICE_STATE, 36, (bitRead(TasmotaGlobal.power, 0)) ? PSTR("bold") : PSTR("normal"), 54, GetStateText(bitRead(TasmotaGlobal.power, 0)));
-      uint32_t fanspeed = GetFanspeed();
-      snprintf_P(svalue, sizeof(svalue), PSTR("%d"), fanspeed);
-      WSContentSend_P(HTTP_DEVICE_STATE, 64, (fanspeed) ? PSTR("bold") : PSTR("normal"), 54, (fanspeed) ? svalue : GetStateText(0));
-    } else {
-#endif  // USE_SONOFF_IFAN
-      uint32_t cols = WebDeviceColumns();
-      uint32_t fontsize = (cols < 5) ? 70 - (cols * 8) : 32;
-      for (uint32_t idx = 1; idx <= TasmotaGlobal.devices_present; idx++) {
-        snprintf_P(svalue, sizeof(svalue), PSTR("%d"), bitRead(TasmotaGlobal.power, idx -1));
-        WSContentSend_P(HTTP_DEVICE_STATE, 100 / cols, (bitRead(TasmotaGlobal.power, idx -1)) ? PSTR("bold") : PSTR("normal"), fontsize,
-          (cols < 5) ? GetStateText(bitRead(TasmotaGlobal.power, idx -1)) : svalue);
-        if (0 == idx % cols) { WSContentSend_P(PSTR("</tr><tr>")); }
-      }
-#ifdef USE_SONOFF_IFAN
-    }
-#endif  // USE_SONOFF_IFAN
-
-    WSContentSend_P(PSTR("</tr></table>"));
-  }
+  WSContentSend_P(PSTR("{t}<tr>"));
+  WSContentSend_P(HTTP_DEVICE_STATE, 40, PSTR("normal"), 17, TasmotaGlobal.mqtt_connected ? "홈 IoT 서비스가 동작 중입니다.":"홈 IoT 서비스에 연결중입니다..");
+  WSContentSend_P(PSTR("</tr></table></br>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
+  if (!TasmotaGlobal.mqtt_connected) {
+    WSContentSend_P("<div style='display:none'>{loader}</div>");
+  }
   WSContentEnd();
 
   return true;
@@ -1445,19 +1190,10 @@ void HandleConfiguration(void)
   WSContentStart_P(PSTR(D_CONFIGURATION));
   WSContentSendStyle();
 
-  WSContentButton(BUTTON_MODULE);
   WSContentButton(BUTTON_WIFI);
 
-  XdrvCall(FUNC_WEB_ADD_BUTTON);
-  XsnsCall(FUNC_WEB_ADD_BUTTON);
-
-  WSContentButton(BUTTON_LOGGING);
-  WSContentButton(BUTTON_OTHER);
-  WSContentButton(BUTTON_TEMPLATE);
-
   WSContentSpaceButton(BUTTON_RESET_CONFIGURATION);
-  WSContentButton(BUTTON_BACKUP);
-  WSContentButton(BUTTON_RESTORE);
+  WSContentSpaceButton(BUTTON_FACTORY_RESET);
 
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
@@ -1811,6 +1547,9 @@ void HandleWifiConfiguration(void) {
       SettingsUpdateText(SET_STASSID1, tmp);
       WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
       SettingsUpdateText(SET_STAPWD1, tmp);
+      WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
+      SettingsUpdateText(SET_DEVICENAME, tmp);
+      SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
         SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
@@ -1985,7 +1724,7 @@ void HandleWifiConfiguration(void) {
     WSContentSend_P(HTTP_FORM_WIFI_PART1, (WifiIsInManagerMode()) ? "" : PSTR(" (" STA_SSID1 ")"), SettingsText(SET_STASSID1));
     if (WifiIsInManagerMode()) {
       // As WIFI_HOSTNAME may contain %s-%04d it cannot be part of HTTP_FORM_WIFI where it will exception
-      WSContentSend_P(PSTR("></p>"));
+      WSContentSend_P(PSTR("></p><p><b> 기기 별명 </b><br><input id='d' placeholder=\" 기기 별명을 입력해주세요 \"></p>"));
     } else {
       WSContentSend_P(HTTP_FORM_WIFI_PART2, SettingsText(SET_STASSID2), WIFI_HOSTNAME, WIFI_HOSTNAME, SettingsText(SET_HOSTNAME), SettingsText(SET_CORS));
     }
@@ -2003,6 +1742,7 @@ void HandleWifiConfiguration(void) {
     } else if (WIFI_TEST_FINISHED_BAD == Web.wifiTest) {
       WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CREDENTIALS "</h3></div>"), SettingsText(SET_STASSID1));
     }
+    WSContentSend_P(PSTR("<button style=\"display:block\" onclick=\"document.getElementById('s1').value='%s';document.getElementById('p1').value='%s';\">Test용 WiFi</button><p></p>"), DEFAULT_SSID, DEFAULT_PASS);
     // More Options Button
     WSContentSend_P(PSTR("<div id=butmod style=\"display:%s;\"></div><p><form id=butmo style=\"display:%s;\"><button type='button' onclick='hidBtns()'>" D_SHOW_MORE_OPTIONS "</button></form></p>"),
       (WIFI_TEST_FINISHED_BAD == Web.wifiTest) ? "none" : Web.initial_config ? "block" : "none", Web.initial_config ? "block" : "none"
@@ -2218,6 +1958,24 @@ void HandleResetConfiguration(void)
   ExecuteWebCommand(command);
 }
 
+void HandleFactoryResetConfiguration(void)
+{
+  if (!HttpCheckPriviledgedAccess(!WifiIsInManagerMode())) { return; }
+
+  AddLog(LOG_LEVEL_DEBUG, PSTR("공장 초기화 중..."));
+
+  WSContentStart_P(PSTR("공장 초기화"), !WifiIsInManagerMode());
+  WSContentSendStyle();
+  WSContentSend_P(PSTR("<div style='text-align:center;'>" D_CONFIGURATION_RESET "</div>"));
+  WSContentSend_P(HTTP_MSG_RSTRT);
+  WSContentSpaceButton(BUTTON_MAIN);
+  WSContentStop();
+
+  char command[CMDSZ];
+  snprintf_P(command, sizeof(command), PSTR(D_CMND_RESET " 2"));
+  ExecuteWebCommand(command);
+}
+
 void HandleRestoreConfiguration(void)
 {
   if (!HttpCheckPriviledgedAccess()) { return; }
@@ -2255,25 +2013,9 @@ void HandleInformation(void)
   // }2 = </th><td>
   WSContentSend_P(HTTP_SCRIPT_INFO_BEGIN);
   WSContentSend_P(PSTR("<table style='width:100%%'><tr><th>"));
+  // TODO: ZIoT 버전 변경
   WSContentSend_P(PSTR(D_PROGRAM_VERSION "}2%s%s"), TasmotaGlobal.version, TasmotaGlobal.image_name);
-  WSContentSend_P(PSTR("}1" D_BUILD_DATE_AND_TIME "}2%s"), GetBuildDateAndTime().c_str());
-  WSContentSend_P(PSTR("}1" D_CORE_AND_SDK_VERSION "}2" ARDUINO_CORE_RELEASE "/%s"), ESP.getSdkVersion());
   WSContentSend_P(PSTR("}1" D_UPTIME "}2%s"), GetUptime().c_str());
-#ifdef ESP8266
-  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d at 0x%X"), Settings->save_flag, GetSettingsAddress());
-#endif  // ESP8266
-#ifdef ESP32
-  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d"), Settings->save_flag);
-#endif  // ESP32
-  WSContentSend_P(PSTR("}1" D_BOOT_COUNT "}2%d"), Settings->bootcount);
-  WSContentSend_P(PSTR("}1" D_RESTART_REASON "}2%s"), GetResetReason().c_str());
-  uint32_t maxfn = (TasmotaGlobal.devices_present > MAX_FRIENDLYNAMES) ? MAX_FRIENDLYNAMES : TasmotaGlobal.devices_present;
-#ifdef USE_SONOFF_IFAN
-  if (IsModuleIfan()) { maxfn = 1; }
-#endif  // USE_SONOFF_IFAN
-  for (uint32_t i = 0; i < maxfn; i++) {
-    WSContentSend_P(PSTR("}1" D_FRIENDLY_NAME " %d}2%s"), i +1, SettingsText(SET_FRIENDLYNAME1 +i));
-  }
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
 #ifdef ESP32
 #ifdef USE_ETHERNET
@@ -2281,7 +2023,7 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_HOSTNAME "}2%s%s"), EthernetHostname(), (Mdns.begun) ? PSTR(".local") : "");
     WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), EthernetMacAddress().c_str());
     WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (eth)}2%_I"), (uint32_t)EthernetLocalIP());
-    WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+    WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   }
 #endif
 #endif
@@ -2298,7 +2040,7 @@ void HandleInformation(void)
     if (static_cast<uint32_t>(WiFi.localIP()) != 0) {
       WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), WiFi.macAddress().c_str());
       WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (wifi)}2%_I"), (uint32_t)WiFi.localIP());
-      WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+      WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
     }
   }
   if (!TasmotaGlobal.global_state.network_down) {
@@ -2307,11 +2049,36 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_DNS_SERVER "}2%_I"), Settings->ipv4_address[3]);
   }
   if ((WiFi.getMode() >= WIFI_AP) && (static_cast<uint32_t>(WiFi.softAPIP()) != 0)) {
-    WSContentSend_P(PSTR("}1<hr/>}2<hr/>"));
+    WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
     WSContentSend_P(PSTR("}1" D_MAC_ADDRESS "}2%s"), WiFi.softAPmacAddress().c_str());
     WSContentSend_P(PSTR("}1" D_IP_ADDRESS " (AP)}2%_I"), (uint32_t)WiFi.softAPIP());
     WSContentSend_P(PSTR("}1" D_GATEWAY "}2%_I"), (uint32_t)WiFi.softAPIP());
   }
+  WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
+  WSContentSend_P(PSTR("</td></tr></table>"));
+
+  WSContentSend_P(HTTP_SCRIPT_INFO_END);
+  WSContentSendStyle();
+  // WSContentSend_P(PSTR("<fieldset><legend><b>&nbsp;Information&nbsp;</b></legend>"));
+  WSContentSend_P(PSTR("<style>td{padding:0px 5px;}</style>"
+                       "<div id='i' name='i'></div>"));
+  //   WSContentSend_P(PSTR("</fieldset>"));
+
+  // Show more
+  WSContentSend_P(PSTR("<div id=\"but2d\" style=\"display:block;\"></div><p></p><form id=\"but2\" style=\"display:block;\"><button onclick=\"if(document.getElementById('hide_context').style.display != ''){document.getElementById('hide_context').style.display = '';this.innerText = '숨기기';}else{document.getElementById('hide_context').style.display = 'none'; this.innerText = '더보기';}\" type=\"button\"/>더보기</button></form>"));
+  WSContentSend_P(PSTR("<div id=\"hide_context\" style=\"display: none;\">"));
+  WSContentSend_P("<script>function hide(){var s,o=\"");
+  WSContentSend_P(PSTR("<table style='width:100%%'><tr><th>"));
+  WSContentSend_P(PSTR(D_BUILD_DATE_AND_TIME "}2%s"), GetBuildDateAndTime().c_str());
+  WSContentSend_P(PSTR("}1" D_CORE_AND_SDK_VERSION "}2" ARDUINO_CORE_RELEASE "/%s"), ESP.getSdkVersion());
+  #ifdef ESP8266
+  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d at 0x%X"), Settings->save_flag, GetSettingsAddress());
+#endif  // ESP8266
+#ifdef ESP32
+  WSContentSend_P(PSTR("}1" D_FLASH_WRITE_COUNT "}2%d"), Settings->save_flag);
+#endif  // ESP32
+  WSContentSend_P(PSTR("}1" D_BOOT_COUNT "}2%d"), Settings->bootcount);
+  WSContentSend_P(PSTR("}1" D_RESTART_REASON "}2%s"), GetResetReason().c_str());
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     WSContentSend_P(PSTR("}1" D_MQTT_HOST "}2%s"), SettingsText(SET_MQTT_HOST));
@@ -2336,22 +2103,17 @@ void HandleInformation(void)
     WSContentSend_P(PSTR("}1" D_MQTT "}2" D_DISABLED));
   }
 
-#if defined(USE_EMULATION) || defined(USE_DISCOVERY)
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
-#endif  // USE_EMULATION or USE_DISCOVERY
 #ifdef USE_EMULATION
   WSContentSend_P(PSTR("}1" D_EMULATION "}2%s"), GetTextIndexed(stopic, sizeof(stopic), Settings->flag2.emulation, kEmulationOptions));
 #endif  // USE_EMULATION
-#ifdef USE_DISCOVERY
   WSContentSend_P(PSTR("}1" D_MDNS_DISCOVERY "}2%s"), (Settings->flag3.mdns_enabled) ? D_ENABLED : D_DISABLED);  // SetOption55 - Control mDNS service
   if (Settings->flag3.mdns_enabled) {  // SetOption55 - Control mDNS service
-#ifdef WEBSERVER_ADVERTISE
     WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_WEB_SERVER));
-#else
-    WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_DISABLED));
-#endif  // WEBSERVER_ADVERTISE
   }
-#endif  // USE_DISCOVERY
+  else {
+    WSContentSend_P(PSTR("}1" D_MDNS_ADVERTISE "}2" D_DISABLED));
+  }
 
   WSContentSend_P(PSTR("}1}2&nbsp;"));  // Empty line
   WSContentSend_P(PSTR("}1" D_ESP_CHIP_ID "}2%d (%s)"), ESP_getChipId(), GetDeviceHardware().c_str());
@@ -2373,13 +2135,10 @@ void HandleInformation(void)
   WSContentSend_PD(PSTR("}1" D_FREE_MEMORY "}2%1_f kB"), &freemem);
 #endif // ESP32
   WSContentSend_P(PSTR("</td></tr></table>"));
+  WSContentSend_P("\";s=o.replace(/}1/g,\"</td></tr><tr><th>\").replace(/}2/g,\"</th><td>\");eb('hide').innerHTML=s;}wl(hide);</script>");
+  WSContentSend_P("<div id='hide' name='hide'></div>");
+  WSContentSend_P(PSTR("</div>"));
 
-  WSContentSend_P(HTTP_SCRIPT_INFO_END);
-  WSContentSendStyle();
-  // WSContentSend_P(PSTR("<fieldset><legend><b>&nbsp;Information&nbsp;</b></legend>"));
-  WSContentSend_P(PSTR("<style>td{padding:0px 5px;}</style>"
-                       "<div id='i' name='i'></div>"));
-  //   WSContentSend_P(PSTR("</fieldset>"));
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
 }
@@ -2983,6 +2742,59 @@ bool CaptivePortal(void)
 #endif  // NO_CAPTIVE_PORTAL
 
 /*********************************************************************************************/
+
+void HandleDeviceInfo(void) {
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"%s\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str(), DEVICE_TYPE);
+  WSContentEnd();
+}
+
+void HandleCertsInfo(void) {
+  if ((strlen(AmazonClientCert) == 0) || strlen(AmazonPrivateKey) == 0) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"cert\":\"%s\", \"key\":\"%s\"}}"), AmazonClientCert, AmazonPrivateKey);
+  WSContentEnd();
+}
+
+void HandleCertsConfiguration(void) {
+  if(!Webserver->hasArg(F("plain"))) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  JsonParser parser((char*) Webserver->arg("plain").c_str());
+  JsonParserObject stateObject = parser.getRootObject();
+  String cert = stateObject["cert"].getStr();
+  String key = stateObject["key"].getStr();
+  char* certCharType = (char*)cert.c_str();
+  char* keyCharType = (char*)key.c_str();
+
+/* TODO: 인증서 사이즈 체크 예외코드 작성
+  if(cert.length() != 256 || key.length() < 10) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
+    WSContentEnd();
+    return;
+  }
+*/
+  memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+  memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+  MqttDisconnect();
+  ConvertTlsFile(0);
+  ConvertTlsFile(1);
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
+  WSContentEnd();
+}
 
 int WebSend(char *buffer)
 {

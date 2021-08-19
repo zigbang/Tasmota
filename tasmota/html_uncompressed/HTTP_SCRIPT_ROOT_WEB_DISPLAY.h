@@ -13,6 +13,9 @@ const char HTTP_SCRIPT_ROOT[] PROGMEM =
                             ".replace(/{m}/g,\"</th><td style='width:20px;white-space:nowrap'>\")"  // I want a right justified column with left justified text
                             ".replace(/{e}/g,\"</td></tr>\");"
         "eb('l1').innerHTML=s;"
+        "if(s.indexOf(\"{loader}\") != -1){"
+        "eb('loader').style.display=\"\";"
+        "} else {eb('loader').style.display=\"none\";}"
         "clearTimeout(ft);clearTimeout(lt);"
         "if(rfsh){"
           "lt=setTimeout(la,%d);"               // Settings.web_refresh

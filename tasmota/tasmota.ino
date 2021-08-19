@@ -46,9 +46,7 @@
   #define USE_DISCOVERY
   #endif
 #endif  // USE_ARDUINO_OTA
-#ifdef USE_DISCOVERY
   #include <ESP8266mDNS.h>                  // MQTT, Webserver, Arduino OTA
-#endif  // USE_DISCOVERY
 //#ifdef USE_I2C
   #include <Wire.h>                         // I2C support library
 //#endif  // USE_I2C
@@ -77,6 +75,8 @@
 
 // Structs
 #include "settings.h"
+
+#include "tasmota_cert.h"
 
 /*********************************************************************************************\
  * Global variables
@@ -141,6 +141,7 @@ struct {
   bool module_changed;                      // Indicate module changed since last restart
   bool wifi_stay_asleep;                    // Allow sleep only incase of ESP32 BLE
   bool no_autoexec;                         // Disable autoexec
+  bool mqtt_connected;
 
   StateBitfield global_state;               // Global states (currently Wifi and Mqtt) (8 bits)
   uint8_t spi_enabled;                      // SPI configured
@@ -288,6 +289,21 @@ void setup(void) {
 #endif
 
   SettingsLoad();
+
+  // TODO: 모듈화
+  char tmp[TOPSZ];
+
+  String mac_address = NetworkUniqueId();
+  String mac_part = mac_address.substring(6);
+
+  sprintf(tmp, "ZiotThing_%s_%s_%s", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1), mac_address.c_str());
+  SettingsUpdateText(SET_MQTT_CLIENT, tmp);
+  SettingsUpdateText(SET_MQTT_TOPIC, tmp);
+  strcpy(TasmotaGlobal.mqtt_client, tmp);
+  strcpy(TasmotaGlobal.mqtt_topic, tmp);
+  sprintf(tmp, "ZiotThing_%s_%s_group", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1));
+  SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
+
   SettingsDelta();
 
   OsWatchInit();
@@ -369,14 +385,12 @@ void setup(void) {
   }
   // Thehackbox inserts "release" or "commit number" before compiling using sed -i -e 's/PSTR("(%s)")/PSTR("(85cff52-%s)")/g' tasmota.ino
   snprintf_P(TasmotaGlobal.image_name, sizeof(TasmotaGlobal.image_name), PSTR("(%s)"), PSTR(CODE_IMAGE_STR));  // Results in (85cff52-tasmota) or (release-tasmota)
-
-  Format(TasmotaGlobal.mqtt_client, SettingsText(SET_MQTT_CLIENT), sizeof(TasmotaGlobal.mqtt_client));
-  Format(TasmotaGlobal.mqtt_topic, SettingsText(SET_MQTT_TOPIC), sizeof(TasmotaGlobal.mqtt_topic));
-  if (strchr(SettingsText(SET_HOSTNAME), '%') != nullptr) {
-    SettingsUpdateText(SET_HOSTNAME, WIFI_HOSTNAME);
-    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME), TasmotaGlobal.mqtt_topic, ESP_getChipId() & 0x1FFF);
-  } else {
+  SettingsUpdateText(SET_HOSTNAME, SettingsText(SET_FRIENDLYNAME1));
+  if (!strstr(SettingsText(SET_HOSTNAME), "ZIGBANG")) { // TODO: Flash에 저장하는 Flag로 대체
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
+  } else {
+    snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, PSTR("%s_%s"), SettingsText(SET_HOSTNAME), mac_part.c_str());
+    SettingsUpdateText(SET_HOSTNAME, TasmotaGlobal.hostname);
   }
 
   RtcInit();
@@ -466,13 +480,7 @@ void Scheduler(void) {
 // check LEAmDNS.h
 // MDNS.update() needs to be called in main loop
 #ifdef ESP8266                     // Not needed with esp32 mdns
-#ifdef USE_DISCOVERY
-#ifdef USE_WEBSERVER
-#ifdef WEBSERVER_ADVERTISE
   MdnsUpdate();
-#endif  // WEBSERVER_ADVERTISE
-#endif  // USE_WEBSERVER
-#endif  // USE_DISCOVERY
 #endif  // ESP8266
 
   OsWatchLoop();
