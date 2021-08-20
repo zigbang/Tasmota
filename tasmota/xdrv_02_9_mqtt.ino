@@ -1852,8 +1852,6 @@ const char HTTP_FORM_MQTT2[] PROGMEM =
 
 void HandleMqttConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
 
   if (Webserver->hasArg(F("save"))) {
@@ -1924,7 +1922,7 @@ bool Xdrv02(uint8_t function)
         result = DecodeCommand(kMqttCommands, MqttCommand, kMqttSynonyms);
         break;
       case FUNC_PRE_INIT:
-        MqttInit();
+        //MqttInit();
         break;
     }
   }
