@@ -78,6 +78,139 @@
 
 #define DEVICE_TYPE            "Light"
 
+// -- MQTT - Domoticz -----------------------------
+#undef USE_DOMOTICZ                                         // Enable Domoticz (+6k code, +0.3k mem)
+  #undef DOMOTICZ_IN_TOPIC                                  // Domoticz Input Topic
+  #undef DOMOTICZ_OUT_TOPIC                                 // Domoticz Output Topic
+
+// -- MQTT - Home Assistant Discovery -------------
+#undef USE_HOME_ASSISTANT                                   // Enable Home Assistant Discovery Support (+12k code, +6 bytes mem)
+  #undef HOME_ASSISTANT_DISCOVERY_PREFIX                    // Home Assistant discovery prefix
+  #undef HOME_ASSISTANT_LWT_TOPIC                           // home Assistant Birth and Last Will Topic (default = homeassistant/status)
+  #undef HOME_ASSISTANT_LWT_SUBSCRIBE                       // Subscribe to Home Assistant Birth and Last Will Topic (default = true)
+
+// -- Telegram Protocol ---------------------------
+  #undef USE_TELEGRAM_FINGERPRINT                           // Telegram api.telegram.org TLS public key fingerpring
+
+// -- KNX IP Protocol -----------------------------
+  #undef USE_KNX_WEB_MENU                                   // Enable KNX WEB MENU (+8.3k code, +144 mem)
+
+// -- HTTP ----------------------------------------
+#undef USE_EMULATION_HUE                                    // Enable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
+  #undef USE_EMULATION_WEMO                                 // Enable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
+
+// -- Time ----------------------------------------
+#undef USE_TIMERS                                           // Add support for up to 16 timers (+2k2 code)
+  #undef USE_TIMERS_WEB                                     // Add timer webpage support (+4k5 code)
+  #undef USE_SUNRISE                                        // Add support for Sunrise and sunset tools (+16k)
+    #undef SUNRISE_DAWN_ANGLE                               // Select desired Dawn Angle from (DAWN_NORMAL, DAWN_CIVIL, DAWN_NAUTIC, DAWN_ASTRONOMIC)
+
+// -- Optional modules ----------------------------
+#undef ROTARY_V1                                            // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
+  #undef ROTARY_MAX_STEPS                                   // Rotary step boundary
+#undef USE_SONOFF_RF                                        // Add support for Sonoff Rf Bridge (+3k2 code)
+  #undef USE_RF_FLASH                                       // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge. C2CK must be connected to GPIO4, C2D to GPIO5 on the PCB (+2k7 code)
+#undef USE_SONOFF_SC                                        // Add support for Sonoff Sc (+1k1 code)
+#undef USE_TUYA_MCU                                         // Add support for Tuya Serial MCU
+  #undef TUYA_DIMMER_ID                                     // Default dimmer Id
+  #undef USE_TUYA_TIME                                      // Add support for Set Time in Tuya MCU
+#undef USE_ARMTRONIX_DIMMERS                                // Add support for Armtronix Dimmers (+1k4 code)
+#undef USE_PS_16_DZ                                         // Add support for PS-16-DZ Dimmer (+2k code)
+#undef USE_SONOFF_IFAN                                      // Add support for Sonoff iFan02 and iFan03 (+2k code)
+#undef USE_BUZZER                                           // Add support for a buzzer (+0k6 code)
+#undef USE_ARILUX_RF                                        // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
+#undef USE_SHUTTER                                          // Add Shutter support for up to 4 shutter with different motortypes (+11k code)
+#undef USE_EXS_DIMMER                                       // Add support for ES-Store Wi-Fi Dimmer (+1k5 code)
+#undef USE_PWM_DIMMER                                       // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k3 code, DGR=0k7)
+  #undef USE_PWM_DIMMER_REMOTE                              // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k6 code)
+#undef USE_SONOFF_D1                                        // Add support for Sonoff D1 Dimmer (+0k7 code)
+#undef USE_SHELLY_DIMMER                                    // Add support for Shelly Dimmer (+3k code)
+  #undef SHELLY_CMDS                                        // Add command to send co-processor commands (+0k3 code)
+  #undef SHELLY_FW_UPGRADE                                  // Add firmware upgrade option for co-processor (+3k4 code)
+
+// -- Optional light modules ----------------------
+#undef USE_LIGHT                                            // Add support for light control
+#undef USE_WS2812                                           // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+  #undef USE_WS2812_RMT                                     // ESP32 only, hardware RMT support (default). Specify the RMT channel 0..7. This should be preferred to software bit bang.
+
+  #undef USE_WS2812_HARDWARE                                // Hardware type (NEO_HW_WS2812, NEO_HW_WS2812X, NEO_HW_WS2813, NEO_HW_SK6812, NEO_HW_LC8812, NEO_HW_APA106, NEO_HW_P9813)
+  #undef USE_WS2812_CTYPE                                   // Color type (NEO_RGB, NEO_GRB, NEO_BRG, NEO_RBG, NEO_RGBW, NEO_GRBW)
+#undef USE_MY92X1                                           // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
+#undef USE_SM16716                                          // Add support for SM16716 RGB LED controller (+0k7 code)
+#undef USE_SM2135                                           // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
+#undef USE_SONOFF_L1                                        // Add support for Sonoff L1 led control
+#undef USE_ELECTRIQ_MOODL                                   // Add support for ElectriQ iQ-wifiMOODL RGBW LED controller (+0k3 code)
+#undef USE_LIGHT_PALETTE                                    // Add support for color palette (+0k7 code)
+#undef USE_LIGHT_VIRTUAL_CT                                 // Add support for Virtual White Color Temperature (+1.1k code)
+#undef USE_DGR_LIGHT_SEQUENCE                               // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
+
+// -- Counter input -------------------------------
+#undef USE_COUNTER                                          // Enable inputs as counter (+0k8 code)
+
+// -- One wire sensors ----------------------------
+#undef USE_DS18x20                                          // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+
+// -- I2C sensors ---------------------------------
+    #undef USE_VEML6070_RSET                                // VEML6070, Rset in Ohm used on PCB board, default 270K = 270000ohm, range for this sensor: 220K ... 1Meg
+    #undef USE_VEML6070_SHOW_RAW                            // VEML6070, shows the raw value of UV-A
+    #undef MGS_SENSOR_ADDR                                  // Default Mutichannel Gas sensor i2c address
+    #undef USE_APDS9960_GESTURE                             // Enable APDS9960 Gesture feature (+2k code)
+    #undef USE_APDS9960_PROXIMITY                           // Enable APDS9960 Proximity feature (>50 code)
+    #undef USE_APDS9960_COLOR                               // Enable APDS9960 Color feature (+0.8k code)
+    #undef USE_APDS9960_STARTMODE                           // Default to enable Gesture mode
+  #undef USE_ADE7953                                        // [I2cDriver7] Enable ADE7953 Energy monitor as used on Shelly 2.5 (I2C address 0x38) (+1k5)
+
+// -- SPI sensors ---------------------------------
+    #undef USE_MIBLE                                        // BLE-bridge for some Mijia-BLE-sensors (+4k7 code)
+    #undef USE_DISPLAY_ILI9341                              // [DisplayModel 4] Enable ILI9341 Tft 480x320 display (+19k code)
+
+// -- Power monitoring sensors --------------------
+#undef USE_ENERGY_SENSOR                                    // Add support for Energy Monitors (+14k code)
+#undef USE_ENERGY_MARGIN_DETECTION                          // Add support for Energy Margin detection (+1k6 code)
+  #undef USE_ENERGY_POWER_LIMIT                             // Add additional support for Energy Power Limit detection (+1k2 code)
+#undef USE_ENERGY_DUMMY                                     // Add support for dummy Energy monitor allowing user values (+0k7 code)
+#undef USE_HLW8012                                          // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
+#undef USE_CSE7766                                          // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
+#undef USE_PZEM004T                                         // Add support for PZEM004T Energy monitor (+2k code)
+#undef USE_PZEM_AC                                          // Add support for PZEM014,016 Energy monitor (+1k1 code)
+#undef USE_PZEM_DC                                          // Add support for PZEM003,017 Energy monitor (+1k1 code)
+#undef USE_MCP39F501                                        // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
+  #undef SDM72_SPEED                                        // SDM72-Modbus RS485 serial speed (default: 9600 baud)
+  #undef SDM120_SPEED                                       // SDM120-Modbus RS485 serial speed (default: 2400 baud)
+  #undef SDM630_SPEED                                       // SDM630-Modbus RS485 serial speed (default: 9600 baud)
+  #undef DDS2382_SPEED                                      // Hiking DDS2382 Modbus RS485 serial speed (default: 9600 baud)
+  #undef DDSU666_SPEED                                      // Chint DDSU666 Modbus RS485 serial speed (default: 9600 baud)
+  #undef SOLAXX1_SPEED                                      // Solax X1 Modbus RS485 serial speed (default: 9600 baud)
+  #undef SOLAXX1_PV2                                        // Solax X1 using second PV
+  #undef LE01MR_SPEED                                       // LE-01MR modbus baudrate (default: 9600)
+  #undef LE01MR_ADDR                                        // LE-01MR modbus address (default: 0x01)
+#undef USE_BL0940                                           // Add support for BL0940 Energy monitor as used in Blitzwolf SHP-10 (+1k6 code)
+  #undef IEM3000_SPEED                                      // iEM3000-Modbus RS485 serial speed (default: 19200 baud)
+  #undef IEM3000_ADDR                                       // iEM3000-Modbus modbus address (default: 0x01)
+
+// -- Low level interface devices -----------------
+#undef USE_DHT                                              // Add support for DHT11, AM2301 (DHT21, DHT22, AM2302, AM2321) and SI7021 Temperature and Humidity sensor (1k6 code)
+  #undef MAX31865_PTD_WIRES                                 // PTDs come in several flavors, pick yours. Specific settings per sensor possible with MAX31865_PTD_WIRES1..MAX31865_PTD_WIRES6
+  #undef MAX31865_PTD_RES                                   // Nominal PTD resistance at 0°C (100Ω for a PT100, 1000Ω for a PT1000, YMMV!). Specific settings per sensor possible with MAX31865_PTD_RES1..MAX31865_PTD_RES6
+  #undef MAX31865_REF_RES                                   // Reference resistor (Usually 430Ω for a PT100, 4300Ω for a PT1000). Specific settings per sensor possible with MAX31865_REF_RES1..MAX31865_REF_RES6
+  #undef MAX31865_PTD_BIAS                                  // To calibrate your not-so-good PTD. Specific settings per sensor possible with MAX31865_PTD_BIAS1..MAX31865_PTD_BIAS6
+
+// -- IR Remote features - subset of IR protocols --------------------------
+#undef USE_IR_REMOTE                                        // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
+  #undef IR_SEND_INVERTED                                   // Invert the output. (default = false) e.g. LED is illuminated when GPIO is LOW rather than HIGH.
+                                                            // Setting inverted to something other than the default could easily destroy your IR LED if you are overdriving it.
+                                                            // Unless you REALLY know what you are doing, don't change this.
+  #undef IR_SEND_USE_MODULATION                             // Do we do frequency modulation during transmission? i.e. If not, assume a 100% duty cycle.
+  #undef USE_IR_SEND_NEC                                    // Support IRsend NEC protocol
+  #undef USE_IR_SEND_RC5                                    // Support IRsend Philips RC5 protocol
+  #undef USE_IR_SEND_RC6                                    // Support IRsend Philips RC6 protocol
+
+  #undef USE_IR_RECEIVE                                     // Support for IR receiver (+7k2 code, 264 iram)
+    #undef IR_RCV_BUFFER_SIZE                               // Max number of packets allowed in capture buffer (default 100 (*2 bytes ram))
+    #undef IR_RCV_TIMEOUT                                   // Number of milli-Seconds of no-more-data before we consider a message ended (default 15)
+    #undef IR_RCV_MIN_UNKNOWN_SIZE                          // Set the smallest sized "UNKNOWN" message packets we actually care about (default 6, max 255)
+    #undef IR_RCV_WHILE_SENDING                             // Turns on receiver while sending messages, i.e. receive your own. This is unreliable and can cause IR timing issues    
+
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp
 // Light theme - pre v7

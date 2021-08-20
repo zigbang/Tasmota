@@ -1345,7 +1345,7 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
-      MqttCheck();
+      //MqttCheck();
     } else {
 #ifdef USE_EMULATION
       UdpDisconnect();
