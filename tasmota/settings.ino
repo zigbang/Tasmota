@@ -877,8 +877,6 @@ void SettingsDefaultSet2(void) {
   flag3.gui_hostname_ip |= GUI_SHOW_HOSTNAME;
   flag3.mdns_enabled |= MDNS_ENABLED;
   Settings->webserver = WEB_SERVER;
-  Settings->weblog_level = WEB_LOG_LEVEL;
-  SettingsUpdateText(SET_WEBPWD, PSTR(WEB_PASSWORD));
   SettingsUpdateText(SET_CORS, PSTR(CORS_DOMAIN));
 
   // Button
