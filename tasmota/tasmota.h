@@ -64,10 +64,10 @@ const uint8_t MAX_PWMS = 5;                 // Max number of PWM channels
 const uint8_t MAX_COUNTERS = 4;             // Max number of counter sensors
 const uint8_t MAX_TIMERS = 16;              // Max number of Timers
 const uint8_t MAX_PULSETIMERS = 8;          // Max number of supported pulse timers
-const uint8_t MAX_DOMOTICZ_IDX = 4;         // Max number of Domoticz device, key and switch indices
-const uint8_t MAX_DOMOTICZ_SNS_IDX = 12;    // Max number of Domoticz sensors indices
-const uint8_t MAX_KNX_GA = 10;              // Max number of KNX Group Addresses to read that can be set
-const uint8_t MAX_KNX_CB = 10;              // Max number of KNX Group Addresses to write that can be set
+const uint8_t MAX_DOMOTICZ_IDX = 1;         // Max number of Domoticz device, key and switch indices
+const uint8_t MAX_DOMOTICZ_SNS_IDX = 1;    // Max number of Domoticz sensors indices
+const uint8_t MAX_KNX_GA = 1;              // Max number of KNX Group Addresses to read that can be set
+const uint8_t MAX_KNX_CB = 1;              // Max number of KNX Group Addresses to write that can be set
 const uint8_t MAX_XNRG_DRIVERS = 32;        // Max number of allowed energy drivers
 const uint8_t MAX_XDSP_DRIVERS = 32;        // Max number of allowed display drivers
 const uint8_t MAX_XDRV_DRIVERS = 96;        // Max number of allowed driver drivers
@@ -78,7 +78,7 @@ const uint8_t MAX_SHUTTER_RELAYS = 8;       // Max number of shutter relays
 const uint8_t MAX_SHUTTER_KEYS = 4;         // Max number of shutter keys or buttons
 const uint8_t MAX_PCF8574 = 4;              // Max number of PCF8574 devices
 const uint8_t MAX_RULE_SETS = 3;            // Max number of rule sets of size 512 characters
-const uint16_t MAX_RULE_SIZE = 512;         // Max number of characters in rules
+const uint16_t MAX_RULE_SIZE = 1;         // Max number of characters in rules
 const uint16_t VL53L0X_MAX_SENSORS = 8;     // Max number of VL53L0X sensors
 
 #ifdef ESP32
@@ -123,6 +123,8 @@ const char WIFI_HOSTNAME[] = "ZIGBANG";     // Expands to <MQTT_TOPIC>-<last 4 d
 const uint8_t CONFIG_FILE_SIGN = 0xA5;      // Configuration file signature
 const uint8_t CONFIG_FILE_XOR = 0x5A;       // Configuration file xor (0 = No Xor)
 
+const uint8_t INPUT_BUFFER_SIZE = 100;     // Max number of characters in serial command buffer
+
 const uint32_t HLW_PREF_PULSE = 12530;      // was 4975us = 201Hz = 1000W
 const uint32_t HLW_UREF_PULSE = 1950;       // was 1666us = 600Hz = 220V
 const uint32_t HLW_IREF_PULSE = 3500;       // was 1666us = 600Hz = 4.545A
@@ -163,17 +165,16 @@ const uint8_t OTA_ATTEMPTS = 10;            // Number of times to try fetching t
 const uint8_t OTA_ATTEMPTS = 5;             // Number of times to try fetching the new firmware
 #endif  // ESP8266
 
-const uint16_t INPUT_BUFFER_SIZE = 520;     // Max number of characters in serial command buffer
 const uint16_t FLOATSZ = 16;                // Max number of characters in float result from dtostrfd (max 32)
 const uint16_t CMDSZ = 24;                  // Max number of characters in command
-const uint16_t TOPSZ = 151;                 // Max number of characters in topic string
+const uint16_t TOPSZ = 100;                 // Max number of characters in topic string
 
 #ifdef ESP8266
 #ifdef PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
 const uint16_t LOG_BUFFER_SIZE = 4096;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 //const uint16_t LOG_BUFFER_SIZE = 6144;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 #else
-const uint16_t LOG_BUFFER_SIZE = 4096;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
+const uint16_t LOG_BUFFER_SIZE = 1024;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 #endif  // PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
 #else   // Not ESP8266
 const uint16_t LOG_BUFFER_SIZE = 6144;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
@@ -187,7 +188,7 @@ const uint16_t MAX_LOGSZ = 700;             // Max number of characters in log l
 
 const uint8_t SENSOR_MAX_MISS = 5;          // Max number of missed sensor reads before deciding it's offline
 
-const uint8_t MAX_BACKLOG = 30;             // Max number of commands in backlog
+const uint8_t MAX_BACKLOG = 10;             // Max number of commands in backlog
 const uint32_t MIN_BACKLOG_DELAY = 200;     // Minimal backlog delay in mSeconds
 
 const uint32_t SOFT_BAUDRATE = 9600;        // Default software serial baudrate
@@ -329,7 +330,7 @@ enum XsnsFunctions {FUNC_SETTINGS_OVERRIDE, FUNC_PIN_STATE, FUNC_MODULE_INIT, FU
                     FUNC_SET_POWER, FUNC_SET_DEVICE_POWER, FUNC_SHOW_SENSOR, FUNC_ANY_KEY,
                     FUNC_ENERGY_EVERY_SECOND, FUNC_ENERGY_RESET,
                     FUNC_RULES_PROCESS, FUNC_TELEPERIOD_RULES_PROCESS, FUNC_SERIAL, FUNC_FREE_MEM, FUNC_BUTTON_PRESSED,
-                    FUNC_WEB_ADD_BUTTON, FUNC_WEB_ADD_CONSOLE_BUTTON, FUNC_WEB_ADD_MANAGEMENT_BUTTON, FUNC_WEB_ADD_MAIN_BUTTON,
+                    FUNC_WEB_ADD_BUTTON, FUNC_WEB_ADD_MANAGEMENT_BUTTON, FUNC_WEB_ADD_MAIN_BUTTON,
                     FUNC_WEB_ADD_HANDLER, FUNC_SET_CHANNELS, FUNC_SET_SCHEME, FUNC_HOTPLUG_SCAN,
                     FUNC_DEVICE_GROUP_ITEM };
 
@@ -399,10 +400,10 @@ enum DevGroupItemFlag { DGR_ITEM_FLAG_NO_SHARE = 1 };
 enum DevGroupShareItem { DGR_SHARE_POWER = 1, DGR_SHARE_LIGHT_BRI = 2, DGR_SHARE_LIGHT_FADE = 4, DGR_SHARE_LIGHT_SCHEME = 8,
                          DGR_SHARE_LIGHT_COLOR = 16, DGR_SHARE_DIMMER_SETTINGS = 32, DGR_SHARE_EVENT = 64 };
 
-enum CommandSource { SRC_IGNORE, SRC_MQTT, SRC_RESTART, SRC_BUTTON, SRC_SWITCH, SRC_BACKLOG, SRC_SERIAL, SRC_WEBGUI, SRC_WEBCOMMAND, SRC_WEBCONSOLE, SRC_PULSETIMER,
+enum CommandSource { SRC_IGNORE, SRC_MQTT, SRC_RESTART, SRC_BUTTON, SRC_SWITCH, SRC_BACKLOG, SRC_SERIAL, SRC_WEBGUI, SRC_WEBCOMMAND, SRC_PULSETIMER,
                      SRC_TIMER, SRC_RULE, SRC_MAXPOWER, SRC_MAXENERGY, SRC_OVERTEMP, SRC_LIGHT, SRC_KNX, SRC_DISPLAY, SRC_WEMO, SRC_HUE, SRC_RETRY, SRC_REMOTE, SRC_SHUTTER,
                      SRC_THERMOSTAT, SRC_CHAT, SRC_TCL, SRC_BERRY, SRC_FILE, SRC_MAX };
-const char kCommandSource[] PROGMEM = "I|MQTT|Restart|Button|Switch|Backlog|Serial|WebGui|WebCommand|WebConsole|PulseTimer|"
+const char kCommandSource[] PROGMEM = "I|MQTT|Restart|Button|Switch|Backlog|Serial|WebGui|WebCommand|PulseTimer|"
                                       "Timer|Rule|MaxPower|MaxEnergy|Overtemp|Light|Knx|Display|Wemo|Hue|Retry|Remote|Shutter|"
                                       "Thermostat|Chat|TCL|Berry|File";
 

@@ -2360,8 +2360,7 @@ void AddLogData(uint32_t loglevel, const char* log_data, const char* log_data_pa
 
   if (!TasmotaGlobal.log_buffer) { return; }  // Leave now if there is no buffer available
 
-  uint32_t highest_loglevel = Settings->weblog_level;
-  if (Settings->mqttlog_level > highest_loglevel) { highest_loglevel = Settings->mqttlog_level; }
+  uint32_t highest_loglevel = Settings->mqttlog_level;
   if (TasmotaGlobal.syslog_level > highest_loglevel) { highest_loglevel = TasmotaGlobal.syslog_level; }
   if (TasmotaGlobal.templog_level > highest_loglevel) { highest_loglevel = TasmotaGlobal.templog_level; }
   if (TasmotaGlobal.uptime < 3) { highest_loglevel = LOG_LEVEL_DEBUG_MORE; }  // Log all before setup correct log level

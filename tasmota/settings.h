@@ -436,7 +436,7 @@ typedef union {
 } DisplayOptions;
 
 const uint32_t settings_text_size = 699;   // Settings->text_pool[size] = Settings->display_model (2D2) - Settings->text_pool (017)
-const uint8_t MAX_TUYA_FUNCTIONS = 16;
+const uint8_t MAX_TUYA_FUNCTIONS = 1;
 
 typedef struct {
   uint16_t      cfg_holder;                // 000  v6 header
@@ -689,7 +689,6 @@ typedef struct {
   uint16_t      syslog_port;               // ECA
   uint8_t       syslog_level;              // ECC
   uint8_t       webserver;                 // ECD
-  uint8_t       weblog_level;              // ECE
   uint8_t       mqtt_fingerprint[2][20];   // ECF
 
   uint8_t       ex_adc_param_type;         // EF7  Free since 9.0.0.1
