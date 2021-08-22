@@ -357,8 +357,8 @@ enum HttpOptions {HTTP_OFF, HTTP_USER, HTTP_ADMIN, HTTP_MANAGER, HTTP_MANAGER_RE
 enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED_SUCCESSFUL, WIFI_TEST_FINISHED_BAD};
 
 DNSServer *DnsServer;
-//ESP8266WebServer *Webserver;
-BearSSL::ESP8266WebServerSecure *Webserver;
+ESP8266WebServer *Webserver;
+BearSSL::ESP8266WebServerSecure *WebserverSecure;
 
 struct WEB {
   String chunk_buffer = "";                         // Could be max 2 * CHUNKED_BUFFER_SIZE
@@ -368,6 +368,7 @@ struct WEB {
   uint8_t config_block_count = 0;
   bool upload_services_stopped = false;
   bool initial_config = false;
+  bool state_HTTPS = false;
   uint8_t wifiTest = WIFI_NOT_TESTING;
   uint8_t wifi_test_counter = 0;
   uint16_t save_data_counter = 0;
@@ -450,6 +451,25 @@ void ExecuteWebCommand(char* svalue) {
   ExecuteWebCommand(svalue, SRC_WEBGUI);
 }
 
+void StartWebserverSecure(void)
+{
+  if (!Web.state_HTTPS) {
+    if (!WebserverSecure) {
+      WebserverSecure = new ESP8266WebServerSecure(443);
+      WebserverSecure->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
+      WebserverSecure->getServer().setBufferSizes(1024, 1024);
+      WebserverSecure->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
+    }
+
+    WebserverSecure->begin(); // Web server start
+  }
+  if (!Web.state_HTTPS) {
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I"),
+      NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", (uint32_t)WiFi.localIP());
+    Web.state_HTTPS = true;
+  }
+}
+
 // replace the series of `Webserver->on()` with a table in PROGMEM
 typedef struct WebServerDispatch_t {
   char uri[3];   // the prefix "/" is added automatically
@@ -485,9 +505,7 @@ void StartWebserver(int type, IPAddress ipweb)
   Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
-      //Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
-      Webserver = new ESP8266WebServerSecure(443);
-      Webserver->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
+      Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
       // call `Webserver->on()` on each entry
       for (uint32_t i=0; i<nitems(WebServerDispatch); i++) {
         const WebServerDispatch_t & line = WebServerDispatch[i];
@@ -505,8 +523,6 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->on(F("/lo"), HTTP_GET, HandleCognitoLogin);
-      Webserver->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
-      Webserver->on(F("/test"), HTTP_GET, HandleTest);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -534,6 +550,8 @@ void StartWebserver(int type, IPAddress ipweb)
     TasmotaGlobal.rules_flag.http_init = 1;
     Web.state = type;
   }
+
+  StartWebserverSecure();
 }
 
 void StopWebserver(void)
@@ -580,6 +598,7 @@ void PollDnsWebserver(void)
 {
   if (DnsServer) { DnsServer->processNextRequest(); }
   if (Webserver) { Webserver->handleClient(); }
+  if (WebserverSecure) { WebserverSecure->handleClient(); }
 }
 
 /*********************************************************************************************/
@@ -907,7 +926,7 @@ void HandleCognitoLogin(void)
 
 void HandleCognitoLoginCode(void)
 {
-  
+  WebserverSecure->send(200, "text/plain", "Hello from esp8266 over HTTPS!");  
 }
 
 void HandleWifiLogin(void)
