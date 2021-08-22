@@ -470,12 +470,13 @@ void StartWebserverSecure(void)
   }
 }
 
+// TODO: 메모리 회수 코드 추가
 void StopWebserverSecure(void)
 {
   if (Web.state_HTTPS) {
     WebserverSecure->close();
     Web.state_HTTPS = false;
-    AddLog(LOG_LEVEL_INFO, F("HTTPS 웹서버 종료"));
+    AddLog(LOG_LEVEL_INFO, PSTR("HTTPS 웹서버 종료"));
   }
 }
 
@@ -559,8 +560,6 @@ void StartWebserver(int type, IPAddress ipweb)
     TasmotaGlobal.rules_flag.http_init = 1;
     Web.state = type;
   }
-
-  StartWebserverSecure();
 }
 
 void StopWebserver(void)
@@ -929,13 +928,18 @@ void WebRestart(uint32_t type)
 
 void HandleCognitoLogin(void)
 {
-  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=openid&redirect_uri=https://nb0pw9tdj5.execute-api.ap-northeast-2.amazonaws.com/2021-08-16/login")), true);
+  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=openid&redirect_uri=https://192.168.219.105/lc")), true);
   WSSend(302, CT_PLAIN, "");  // Empty content inhibits Content-length header so we have to close the socket ourselves.
+  StartWebserverSecure();
 }
 
 void HandleCognitoLoginCode(void)
 {
-  WebserverSecure->send(200, "text/plain", "Hello from esp8266 over HTTPS!");  
+  Serial.print("========================= Cognito code is ");
+  Serial.println(WebserverSecure->arg("code"));
+  WebserverSecure->sendHeader(F("Location"), String(F("http://")) + WebserverSecure->client().localIP().toString(), true);
+  WebserverSecure->send(302, "text/plain", "");
+  StopWebserverSecure();
 }
 
 void HandleWifiLogin(void)
@@ -1093,12 +1097,6 @@ void HandleConfiguration(void)
 
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
-}
-
-/*-------------------------------------------------------------------------------------------*/
-
-void HandleTest(void) {
-  Webserver->send(200, "text/plain", "Hello from esp8266 over HTTPS!");
 }
 
 /*-------------------------------------------------------------------------------------------*/
