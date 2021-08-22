@@ -60,6 +60,7 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
+#include <ESP8266WebServerSecure.h>
 
 const char HTTP_SCRIPT_ROOT2[] PROGMEM =
   "var rfsh=1,ft;"
@@ -183,63 +184,6 @@ const char HTTP_SCRIPT_RELOAD_TIME[] PROGMEM =
   #include "./html_uncompressed/HTTP_SCRIPT_CONSOL.h"
 #endif
 
-const char HTTP_MODULE_TEMPLATE_REPLACE_INDEX[] PROGMEM =
-  "}2%d'>%s (%d)}3";                       // }2 and }3 are used in below os.replace
-const char HTTP_MODULE_TEMPLATE_REPLACE_NO_INDEX[] PROGMEM =
-  "}2%d'>%s}3";                           // }2 and }3 are used in below os.replace
-
-#ifdef USE_UNISHOX_COMPRESSION
-  #include "./html_compressed/HTTP_SCRIPT_MODULE_TEMPLATE.h"
-  #include "./html_compressed/HTTP_SCRIPT_TEMPLATE.h"
-#else
-  #include "./html_uncompressed/HTTP_SCRIPT_MODULE_TEMPLATE.h"
-  #include "./html_uncompressed/HTTP_SCRIPT_TEMPLATE.h"
-#endif
-
-#if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-const char HTTP_SCRIPT_TEMPLATE2[] PROGMEM =
-    "for(i=0;i<" STR(MAX_USER_PINS) ";i++){"
-      "sk(g[i],i);"                       // Set GPIO
-    "}";
-#else // Now ESP32 and ESP8266
-const char HTTP_SCRIPT_TEMPLATE2[] PROGMEM =
-    "j=0;"
-    "for(i=0;i<" STR(MAX_USER_PINS) ";i++){"  // Supports 13 GPIOs
-      "if(6==i){j=9;}"
-      "if(8==i){j=12;}"
-      "sk(g[i],j);"                       // Set GPIO
-      "j++;"
-    "}";
-#endif
-const char HTTP_SCRIPT_TEMPLATE3[] PROGMEM =
-    "\";"
-    "sk(g[13]," STR(ADC0_PIN) ");";       // Set ADC0
-
-const char HTTP_SCRIPT_TEMPLATE4[] PROGMEM =
-    "g=o.shift();"                        // FLAG
-    "for(i=0;i<" STR(GPIO_FLAG_USED) ";i++){"
-      "p=(g>>i)&1;"
-      "eb('c'+i).checked=p;"              // Set FLAG checkboxes
-    "}"
-    "if(" STR(USER_MODULE) "==c){"
-      "g=o.shift();"
-      "eb('g99').value=g;"                // Set BASE for initial select
-    "}"
-  "}"
-  "function st(t){"
-    "c=t;"                                // Needed for initial BASE select
-    "var a='tp?t='+t;"
-    "ld(a,x1);"                           // ?t related to WebGetArg("t", stemp, sizeof(stemp));
-  "}"
-  "function sl(){"
-    "os=\"";                              // }2'0'>Sonoff Basic (1)}3...
-const char HTTP_SCRIPT_TEMPLATE5[] PROGMEM =
-    "\";"
-    "sk(" STR(WEMOS_MODULE) ",99);"       // 17 = WEMOS
-    "st(" STR(USER_MODULE) ");"
-  "}"
-  "wl(sl);";
-
 const char HTTP_SCRIPT_INFO_BEGIN[] PROGMEM =
   "function i(){"
     "var s,o=\"";
@@ -328,21 +272,6 @@ const char HTTP_FORM_LOGIN[] PROGMEM =
   "<button>" D_OK "</button>"
   "</form></fieldset>";
 
-const char HTTP_FORM_TEMPLATE[] PROGMEM =
-  "<fieldset><legend><b>&nbsp;" D_TEMPLATE_PARAMETERS "&nbsp;</b></legend>"
-  "<form method='get' action='tp'>";
-const char HTTP_FORM_TEMPLATE_FLAG[] PROGMEM =
-  "<p></p>"  // Keep close so do not use <br>
-  "<fieldset><legend><b>&nbsp;" D_TEMPLATE_FLAGS "&nbsp;</b></legend><p>"
-//  "<label><input id='c0' name='c0' type='checkbox'><b>" D_OPTION_TEXT "</b></label><br>"
-  "</p></fieldset>";
-
-const char HTTP_FORM_MODULE[] PROGMEM =
-  "<fieldset><legend><b>&nbsp;" D_MODULE_PARAMETERS "&nbsp;</b></legend>"
-  "<form method='get' action='md'>"
-  "<p></p><b>" D_MODULE_TYPE "</b> (%s)<br><select id='g99'></select><br>"
-  "<br><table>";
-
 const char HTTP_FORM_WIFI_PART1[] PROGMEM =
   "<fieldset><legend><b>&nbsp;" D_WIFI_PARAMETERS "&nbsp;</b></legend>"
   "<form method='get' action='wi'>"
@@ -355,30 +284,6 @@ const char HTTP_FORM_WIFI_PART2[] PROGMEM =
   "<p><label><b>" D_AP_PASSWORD "</b><input type='checkbox' onclick='sp(\"p2\")'></label><br><input id='p2' type='password' placeholder=\"" D_AP_PASSWORD_HELP "\" value=\"" D_ASTERISK_PWD "\"></p>"
   "<p><b>" D_HOSTNAME "</b> (%s)<br><input id='h' placeholder=\"%s\" value=\"%s\"></p>"
   "<p><b>" D_CORS_DOMAIN "</b><input id='c' placeholder=\"" CORS_DOMAIN "\" value=\"%s\"></p>";
-
-const char HTTP_FORM_LOG1[] PROGMEM =
-  "<fieldset><legend><b>&nbsp;" D_LOGGING_PARAMETERS "&nbsp;</b>"
-  "</legend><form method='get' action='lg'>";
-const char HTTP_FORM_LOG2[] PROGMEM =
-  "<p><b>" D_SYSLOG_HOST "</b> (" SYS_LOG_HOST ")<br><input id='lh' placeholder=\"" SYS_LOG_HOST "\" value=\"%s\"></p>"
-  "<p><b>" D_SYSLOG_PORT "</b> (" STR(SYS_LOG_PORT) ")<br><input id='lp' placeholder='" STR(SYS_LOG_PORT) "' value='%d'></p>"
-  "<p><b>" D_TELEMETRY_PERIOD "</b> (" STR(TELE_PERIOD) ")<br><input id='lt' placeholder='" STR(TELE_PERIOD) "' value='%d'></p>";
-
-const char HTTP_FORM_OTHER[] PROGMEM =
-  "<fieldset><legend><b>&nbsp;" D_OTHER_PARAMETERS "&nbsp;</b></legend>"
-  "<form method='get' action='co'>"
-  "<p></p>"
-  "<fieldset><legend><b>&nbsp;" D_TEMPLATE "&nbsp;</b></legend>"
-  "<p><input id='t1' placeholder=\"" D_TEMPLATE "\" value='%s'></p>"  // We need ' apostrophe here as the template contains " quotation mark
-  "<p><label><input id='t2' type='checkbox'%s><b>" D_ACTIVATE "</b></label></p>"
-  "</fieldset>"
-  "<br>"
-  "<label><b>" D_WEB_ADMIN_PASSWORD "</b><input type='checkbox' onclick='sp(\"wp\")'></label><br><input id='wp' type='password' placeholder=\"" D_WEB_ADMIN_PASSWORD "\" value=\"" D_ASTERISK_PWD "\"><br>"
-  "<br>"
-  "<label><input id='b1' type='checkbox'%s><b>" D_MQTT_ENABLE "</b></label><br>"
-  "<br>"
-  "<label><b>" D_DEVICE_NAME "</b> (%s)</label><br><input id='dn' placeholder=\"\" value=\"%s\"><br>"
-  "<br>";
 
 const char HTTP_FORM_END[] PROGMEM =
   "<br>"
@@ -427,26 +332,20 @@ const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:cente
 
 enum ButtonTitle {
   BUTTON_RESTART, BUTTON_RESET_CONFIGURATION, BUTTON_FACTORY_RESET,
-  BUTTON_MAIN, BUTTON_COGNITO_LOGIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_MANAGEMENT,
-  BUTTON_MODULE, BUTTON_WIFI, BUTTON_LOGGING, BUTTON_OTHER, BUTTON_TEMPLATE, BUTTON_BACKUP, BUTTON_RESTORE,
-  BUTTON_CONSOLE };
+  BUTTON_MAIN, BUTTON_COGNITO_LOGIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_WIFI, BUTTON_BACKUP, BUTTON_RESTORE };
 const char kButtonTitle[] PROGMEM =
   D_RESTART "|" D_RESET_CONFIGURATION "|" "공장 초기화" "|"
-  D_MAIN_MENU "|" "로그인" "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|" D_MANAGEMENT "|"
-  D_CONFIGURE_MODULE "|" D_CONFIGURE_WIFI"|" D_CONFIGURE_LOGGING "|" D_CONFIGURE_OTHER "|" D_CONFIGURE_TEMPLATE "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|"
-  D_CONSOLE;
+  D_MAIN_MENU "|" "로그인" "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|"
+  D_CONFIGURE_WIFI "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|";
 const char kButtonAction[] PROGMEM =
   ".|rt|frt|"
-  ".|lo|cn|in|up|mn|"
-  "md|wi|lg|co|tp|dl|rs|"
-  "cs";
+  ".|lo|cn|in|up|"
+  "wi|dl|rs|";
+
 const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION "|" "공장 초기화 확인";
 
 enum CTypes { CT_HTML, CT_PLAIN, CT_XML, CT_STREAM, CT_APP_JSON, CT_APP_STREAM };
 const char kContentTypes[] PROGMEM = "text/html|text/plain|text/xml|text/event-stream|application/json|application/octet-stream";
-
-const char kLoggingOptions[] PROGMEM = D_SERIAL_LOG_LEVEL "|" D_WEB_LOG_LEVEL "|" D_MQTT_LOG_LEVEL "|" D_SYS_LOG_LEVEL;
-const char kLoggingLevels[] PROGMEM = D_NONE "|" D_ERROR "|" D_INFO "|" D_DEBUG "|" D_MORE_DEBUG;
 
 const char kEmulationOptions[] PROGMEM = D_NONE "|" D_BELKIN_WEMO "|" D_HUE_BRIDGE;
 
@@ -458,7 +357,8 @@ enum HttpOptions {HTTP_OFF, HTTP_USER, HTTP_ADMIN, HTTP_MANAGER, HTTP_MANAGER_RE
 enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED_SUCCESSFUL, WIFI_TEST_FINISHED_BAD};
 
 DNSServer *DnsServer;
-ESP8266WebServer *Webserver;
+//ESP8266WebServer *Webserver;
+BearSSL::ESP8266WebServerSecure *Webserver;
 
 struct WEB {
   String chunk_buffer = "";                         // Could be max 2 * CHUNKED_BUFFER_SIZE
@@ -467,7 +367,6 @@ struct WEB {
   uint8_t upload_file_type;
   uint8_t config_block_count = 0;
   bool upload_services_stopped = false;
-  bool reset_web_log_flag = false;                  // Reset web console log
   bool initial_config = false;
   uint8_t wifiTest = WIFI_NOT_TESTING;
   uint8_t wifi_test_counter = 0;
@@ -561,7 +460,6 @@ typedef struct WebServerDispatch_t {
 const WebServerDispatch_t WebServerDispatch[] PROGMEM = {
   { "",   HTTP_ANY, HandleRoot },
   { "u2", HTTP_OPTIONS, HandlePreflightRequest },
-  { "mn", HTTP_GET, HandleManagement },
   { "cs", HTTP_OPTIONS, HandlePreflightRequest },
   { "cm", HTTP_ANY, HandleHttpCommand },
 #ifndef FIRMWARE_MINIMAL
@@ -587,7 +485,9 @@ void StartWebserver(int type, IPAddress ipweb)
   Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
-      Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
+      //Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
+      Webserver = new ESP8266WebServerSecure(443);
+      Webserver->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
       // call `Webserver->on()` on each entry
       for (uint32_t i=0; i<nitems(WebServerDispatch); i++) {
         const WebServerDispatch_t & line = WebServerDispatch[i];
@@ -606,6 +506,7 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->on(F("/lo"), HTTP_GET, HandleCognitoLogin);
       Webserver->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
+      Webserver->on(F("/test"), HTTP_GET, HandleTest);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -613,7 +514,6 @@ void StartWebserver(int type, IPAddress ipweb)
       XsnsCall(FUNC_WEB_ADD_HANDLER);
 #endif  // Not FIRMWARE_MINIMAL
     }
-    Web.reset_web_log_flag = false;
 
     Webserver->begin(); // Web server start
   }
@@ -683,28 +583,6 @@ void PollDnsWebserver(void)
 }
 
 /*********************************************************************************************/
-
-bool WebAuthenticate(void)
-{
-  if (strlen(SettingsText(SET_WEBPWD)) && (HTTP_MANAGER_RESET_ONLY != Web.state)) {
-    return Webserver->authenticate(WEB_USERNAME, SettingsText(SET_WEBPWD));
-  } else {
-    return true;
-  }
-}
-
-bool HttpCheckPriviledgedAccess(bool autorequestauth = true)
-{
-  if (HTTP_USER == Web.state) {
-    HandleRoot();
-    return false;
-  }
-  if (autorequestauth && !WebAuthenticate()) {
-    Webserver->requestAuthentication();
-    return false;
-  }
-  return true;
-}
 
 void HttpHeaderCors(void)
 {
@@ -820,10 +698,6 @@ void WSContentSend_PD(const char* formatP, ...) {  // Content send snprintf_P ch
 
 void WSContentStart_P(const char* title, bool auth)
 {
-  if (auth && !WebAuthenticate()) {
-    return Webserver->requestAuthentication();
-  }
-
   WSContentBegin(200, CT_HTML);
 
   if (title != nullptr) {
@@ -847,7 +721,7 @@ void WSContentSendStyle_P(const char* formatP, ...)
   WSContentSend_P(HTTP_HEAD_LAST_SCRIPT);
 
   WSContentSend_P(HTTP_HEAD_STYLE1, WebColor(COL_FORM), WebColor(COL_INPUT), WebColor(COL_INPUT_TEXT), WebColor(COL_INPUT),
-                  WebColor(COL_INPUT_TEXT), WebColor(COL_CONSOLE), WebColor(COL_CONSOLE_TEXT), WebColor(COL_BACKGROUND));
+                  WebColor(COL_INPUT_TEXT), PSTR(""), PSTR(""), WebColor(COL_BACKGROUND));
   WSContentSend_P(HTTP_HEAD_STYLE2, WebColor(COL_BUTTON), WebColor(COL_BUTTON_TEXT), WebColor(COL_BUTTON_HOVER),
                   WebColor(COL_BUTTON_RESET), WebColor(COL_BUTTON_RESET_HOVER), WebColor(COL_BUTTON_SAVE), WebColor(COL_BUTTON_SAVE_HOVER),
                   WebColor(COL_BUTTON));
@@ -1052,19 +926,6 @@ void HandleWifiLogin(void)
   WSContentStop();
 }
 
-uint32_t WebUseManagementSubmenu(void) {
-  static uint32_t management_count = 0;
-
-  if (!management_count) {
-    XdrvMailbox.index = 1;
-    XdrvCall(FUNC_WEB_ADD_CONSOLE_BUTTON);
-    XsnsCall(FUNC_WEB_ADD_CONSOLE_BUTTON);
-    XdrvCall(FUNC_WEB_ADD_MANAGEMENT_BUTTON);
-    management_count = XdrvMailbox.index;
-  }
-  return management_count -1;
-}
-
 uint32_t WebDeviceColumns(void) {
   const uint32_t max_columns = 8;
 
@@ -1129,8 +990,8 @@ void HandleRoot(void)
   WSContentSend_P(HTTP_SCRIPT_ROOT_PART2);
 
   WSContentSendStyle();
-  WSContentSend_P("<div id=\"loader\" style='padding:0'></div>");
-  WSContentSend_P("</br>");
+  WSContentSend_P(PSTR("<div id=\"loader\" style='padding:0'></div>"));
+  WSContentSend_P(PSTR("</br>"));
 
   WSContentSend_P(PSTR("<div style='padding:0;' id='l1' name='l1'></div>"));
 
@@ -1150,11 +1011,6 @@ void HandleRoot(void)
 
 bool HandleRootStatusRefresh(void)
 {
-  if (!WebAuthenticate()) {
-    Webserver->requestAuthentication();
-    return true;
-  }
-
   if (!Webserver->hasArg("m")) {     // Status refresh requested
     return false;
   }
@@ -1168,7 +1024,7 @@ bool HandleRootStatusRefresh(void)
   WSContentSend_P(PSTR("</tr></table></br>"));
   WSContentSend_P(PSTR("\n\n"));  // Prep for SSE
   if (!TasmotaGlobal.mqtt_connected) {
-    WSContentSend_P("<div style='display:none'>{loader}</div>");
+    WSContentSend_P(PSTR("<div style='display:none'>{loader}</div>"));
   }
   WSContentEnd();
 
@@ -1197,8 +1053,6 @@ int32_t IsShutterWebButton(uint32_t idx) {
 
 void HandleConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURATION));
 
   WSContentStart_P(PSTR(D_CONFIGURATION));
@@ -1215,299 +1069,8 @@ void HandleConfiguration(void)
 
 /*-------------------------------------------------------------------------------------------*/
 
-void WSContentSendNiceLists(uint32_t option) {
-  char stemp[30];                                             // Template number and Sensor name
-  for (uint32_t i = 0; i < nitems(kGpioNiceList); i++) {  // GPIO: }2'0'>None (0)}3}2'17'>Button1 (17)}3...
-    if (option && (1 == i)) {
-      WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_NO_INDEX, AGPIO(GPIO_USER), PSTR(D_SENSOR_USER));  // }2'255'>User}3
-    }
-    uint32_t ridx = pgm_read_word(kGpioNiceList + i) & 0xFFE0;
-    uint32_t midx = BGPIO(ridx);
-    WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_NO_INDEX, ridx, GetTextIndexed(stemp, sizeof(stemp), midx, kSensorNames));
-  }
-  WSContentSend_P(PSTR("\";"));
-
-  WSContentSend_P(PSTR("hs=["));
-  uint32_t midx;
-  bool first_done = false;
-  for (uint32_t i = 0; i < nitems(kGpioNiceList); i++) {  // hs=[36,68,100,132,168,200,232,264,292,324,356,388,421,453];
-    midx = pgm_read_word(kGpioNiceList + i);
-    if (midx & 0x001F) {
-      if (first_done) { WSContentSend_P(PSTR(",")); }
-      WSContentSend_P(PSTR("%d"), midx);
-      first_done = true;
-    }
-  }
-#ifdef ESP8266
-#ifdef USE_ADC
-  for (uint32_t i = 0; i < nitems(kAdcNiceList); i++) {   // hs=[36,68,100,132,168,200,232,264,292,324,356,388,421,453];
-    midx = pgm_read_word(kAdcNiceList + i);
-    if (midx & 0x001F) {
-      if (first_done) { WSContentSend_P(PSTR(",")); }
-      WSContentSend_P(PSTR("%d"), midx);
-      first_done = true;
-    }
-  }
-#endif  // USE_ADC
-#endif  // ESP8266
-  WSContentSend_P(PSTR("];"));
-}
-
-#ifdef ESP8266
-#ifdef USE_ADC
-void WSContentSendAdcNiceList(uint32_t option) {
-  char stemp[30];                                             // Template number and Sensor name
-  WSContentSend_P(PSTR("os=\""));
-  for (uint32_t i = 0; i < nitems(kAdcNiceList); i++) {   // GPIO: }2'0'>None}3}2'17'>Analog}3...
-    if (option && (1 == i)) {
-      WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_NO_INDEX, AGPIO(GPIO_USER), PSTR(D_SENSOR_USER));  // }2'15'>User}3
-    }
-    uint32_t ridx = pgm_read_word(kAdcNiceList + i) & 0xFFE0;
-    uint32_t midx = BGPIO(ridx);
-    WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_NO_INDEX, ridx, GetTextIndexed(stemp, sizeof(stemp), midx, kSensorNames));
-  }
-}
-#endif  // USE_ADC
-#endif  // ESP8266
-
-/*-------------------------------------------------------------------------------------------*/
-
-void HandleTemplateConfiguration(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  if (Webserver->hasArg(F("save"))) {
-    TemplateSaveSettings();
-    WebRestart(1);
-    return;
-  }
-
-  char stemp[30];                                           // Template number and Sensor name
-
-  WebGetArg(PSTR("t"), stemp, sizeof(stemp));                     // 0 - 69 Template number
-  if (strlen(stemp)) {
-    uint32_t module = atoi(stemp);
-    uint32_t module_save = Settings->module;
-    Settings->module = module;
-    myio template_gp;
-    TemplateGpios(&template_gp);
-    gpio_flag flag = ModuleFlag();
-    Settings->module = module_save;
-
-    WSContentBegin(200, CT_PLAIN);
-    WSContentSend_P(PSTR("%s}1"), AnyModuleName(module).c_str());  // NAME: Generic
-    for (uint32_t i = 0; i < nitems(template_gp.io); i++) {        // 17,148,29,149,7,255,255,255,138,255,139,255,255
-#if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-      // ESP32C3 we always send all GPIOs, Flash are just hidden
-      WSContentSend_P(PSTR("%s%d"), (i>0)?",":"", template_gp.io[i]);
-#else
-      if (!FlashPin(i)) {
-        WSContentSend_P(PSTR("%s%d"), (i>0)?",":"", template_gp.io[i]);
-      }
-#endif
-    }
-    WSContentSend_P(PSTR("}1%d}1%d"), flag, Settings->user_template_base);  // FLAG: 1  BASE: 17
-    WSContentEnd();
-    return;
-  }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_TEMPLATE));
-
-  WSContentStart_P(PSTR(D_CONFIGURE_TEMPLATE));
-  WSContentSend_P(HTTP_SCRIPT_MODULE_TEMPLATE);
-
-  WSContentSend_P(HTTP_SCRIPT_TEMPLATE);
-
-  WSContentSendNiceLists(1);
-
-  WSContentSend_P(HTTP_SCRIPT_TEMPLATE2);
-
-#ifdef ESP8266
-#ifdef USE_ADC
-  WSContentSendAdcNiceList(1);
-  WSContentSend_P(HTTP_SCRIPT_TEMPLATE3);
-#endif  // USE_ADC
-#endif  // ESP8266
-
-  WSContentSend_P(HTTP_SCRIPT_TEMPLATE4);
-  for (uint32_t i = 0; i < sizeof(kModuleNiceList); i++) {  // "}2'%d'>%s (%d)}3" - "}2'0'>Sonoff Basic (1)}3"
-    uint32_t midx = pgm_read_byte(kModuleNiceList + i);
-    WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_INDEX, midx, AnyModuleName(midx).c_str(), midx +1);
-  }
-  WSContentSend_P(HTTP_SCRIPT_TEMPLATE5);
-
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_TEMPLATE);
-  WSContentSend_P(HTTP_TABLE100);
-  WSContentSend_P(PSTR("<tr><td><b>" D_TEMPLATE_NAME "</b></td><td style='width:200px'><input id='s1' placeholder='" D_TEMPLATE_NAME "'></td></tr>"
-                       "<tr><td><b>" D_BASE_TYPE "</b></td><td><select id='g99' onchange='st(this.value)'></select></td></tr>"
-                       "</table>"
-                       "<hr/>"));
-  WSContentSend_P(HTTP_TABLE100);
-  for (uint32_t i = 0; i < MAX_GPIO_PIN; i++) {
-#if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-    // ESP32C3 all gpios are in the template, flash are hidden
-    bool hidden = FlashPin(i);
-    WSContentSend_P(PSTR("<tr%s><td><b><font color='#%06x'>" D_GPIO "%d</font></b></td><td%s><select id='g%d' onchange='ot(%d,this.value)'></select></td>"),
-      hidden ? PSTR(" hidden") : "",
-      RedPin(i) ? WebColor(COL_TEXT_WARNING) : WebColor(COL_TEXT), i, (0==i) ? PSTR(" style='width:146px'") : "", i, i);
-    WSContentSend_P(PSTR("<td style='width:54px'><select id='h%d'></select></td></tr>"), i);
-#else
-    if (!FlashPin(i)) {
-      WSContentSend_P(PSTR("<tr><td><b><font color='#%06x'>" D_GPIO "%d</font></b></td><td%s><select id='g%d' onchange='ot(%d,this.value)'></select></td>"),
-        RedPin(i) ? WebColor(COL_TEXT_WARNING) : WebColor(COL_TEXT), i, (0==i) ? PSTR(" style='width:146px'") : "", i, i);
-      WSContentSend_P(PSTR("<td style='width:54px'><select id='h%d'></select></td></tr>"), i);
-    }
-#endif
-  }
-  WSContentSend_P(PSTR("</table>"));
-
-  gpio_flag flag = ModuleFlag();
-  if (flag.data) {
-    WSContentSend_P(HTTP_FORM_TEMPLATE_FLAG);
-  }
-
-  WSContentSend_P(HTTP_FORM_END);
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-  WSContentStop();
-}
-
-uint16_t WebGetGpioArg(uint32_t i) {
-  char webindex[5];                                         // WebGetArg name
-  snprintf_P(webindex, sizeof(webindex), PSTR("g%d"), i);
-  char tmp[8];                                              // WebGetArg numbers only
-  WebGetArg(webindex, tmp, sizeof(tmp));                    // GPIO
-  uint32_t gpio = (!strlen(tmp)) ? 0 : atoi(tmp);
-  char webindex2[5];                                        // WebGetArg name
-  snprintf_P(webindex2, sizeof(webindex2), PSTR("h%d"), i);
-  char tmp2[8];                                             // WebGetArg numbers only
-  WebGetArg(webindex2, tmp2, sizeof(tmp2));
-  uint32_t value2 = (!strlen(tmp2)) ? 0 : atoi(tmp2) -1;
-  gpio += value2;
-  return gpio;
-}
-
-void TemplateSaveSettings(void) {
-  char tmp[TOPSZ];                                      // WebGetArg NAME and GPIO/BASE/FLAG byte value
-  char command[300];                                    // Template command string
-
-  WebGetArg(PSTR("s1"), tmp, sizeof(tmp));              // NAME
-  snprintf_P(command, sizeof(command), PSTR(D_CMND_TEMPLATE " {\"" D_JSON_NAME "\":\"%s\",\"" D_JSON_GPIO "\":["), tmp);
-
-  uint32_t j = 0;
-  for (uint32_t i = 0; i < nitems(Settings->user_template.gp.io); i++) {
-#if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-    snprintf_P(command, sizeof(command), PSTR("%s%s%d"), command, (i>0)?",":"", WebGetGpioArg(i));
-#else
-    if (6 == i) { j = 9; }
-    if (8 == i) { j = 12; }
-    snprintf_P(command, sizeof(command), PSTR("%s%s%d"), command, (i>0)?",":"", WebGetGpioArg(j));
-    j++;
-#endif
-  }
-
-  uint32_t flag = 0;
-  char webindex[5];                                     // WebGetArg name
-  for (uint32_t i = 0; i < GPIO_FLAG_USED; i++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("c%d"), i);
-    uint32_t state = Webserver->hasArg(webindex) << i;  // FLAG
-    flag += state;
-  }
-  WebGetArg(PSTR("g99"), tmp, sizeof(tmp));             // BASE
-  uint32_t base = atoi(tmp) +1;
-
-  snprintf_P(command, sizeof(command), PSTR("%s],\"" D_JSON_FLAG "\":%d,\"" D_JSON_BASE "\":%d}"), command, flag, base);
-  ExecuteWebCommand(command);
-}
-
-/*-------------------------------------------------------------------------------------------*/
-
-void HandleModuleConfiguration(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  if (Webserver->hasArg(F("save"))) {
-    ModuleSaveSettings();
-    WebRestart(1);
-    return;
-  }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MODULE));
-
-  char stemp[30];  // Sensor name
-  uint32_t midx;
-  myio template_gp;
-  TemplateGpios(&template_gp);
-
-  WSContentStart_P(PSTR(D_CONFIGURE_MODULE));
-  WSContentSend_P(HTTP_SCRIPT_MODULE_TEMPLATE);
-
-  WSContentSend_P(PSTR("function sl(){os=\""));
-  uint32_t vidx = 0;
-  for (uint32_t i = 0; i <= sizeof(kModuleNiceList); i++) {  // "}2'%d'>%s (%d)}3" - "}2'255'>UserTemplate (0)}3" - "}2'0'>Sonoff Basic (1)}3"
-    if (0 == i) {
-      midx = USER_MODULE;
-      vidx = 0;
-    } else {
-      midx = pgm_read_byte(kModuleNiceList + i -1);
-      vidx = midx +1;
-    }
-    WSContentSend_P(HTTP_MODULE_TEMPLATE_REPLACE_INDEX, midx, AnyModuleName(midx).c_str(), vidx);
-  }
-  WSContentSend_P(PSTR("\";sk(%d,99);os=\""), Settings->module);
-
-  WSContentSendNiceLists(0);
-
-  for (uint32_t i = 0; i < nitems(template_gp.io); i++) {
-    if (ValidGPIO(i, template_gp.io[i])) {
-      WSContentSend_P(PSTR("sk(%d,%d);"), TasmotaGlobal.my_module.io[i], i);  // g0 - g17
-    }
-  }
-
-#ifdef ESP8266
-#ifdef USE_ADC
-  WSContentSendAdcNiceList(0);
-  WSContentSend_P(PSTR("\";sk(%d," STR(ADC0_PIN) ");"), Settings->my_gp.io[(sizeof(myio) / 2) -1]);
-#endif  // USE_ADC
-#endif  // ESP8266
-
-  WSContentSend_P(PSTR("}wl(sl);"));
-
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_MODULE, AnyModuleName(MODULE).c_str());
-  for (uint32_t i = 0; i < nitems(template_gp.io); i++) {
-    if (ValidGPIO(i, template_gp.io[i])) {
-      snprintf_P(stemp, 3, PINS_WEMOS +i*2);
-      WSContentSend_P(PSTR("<tr><td style='width:116px'>%s <b>" D_GPIO "%d</b></td><td style='width:146px'><select id='g%d' onchange='ot(%d,this.value)'></select></td>"),
-        (WEMOS==TasmotaGlobal.module_type)?stemp:"", i, i, i);
-      WSContentSend_P(PSTR("<td style='width:54px'><select id='h%d'></select></td></tr>"), i);
-    }
-  }
-  WSContentSend_P(PSTR("</table>"));
-  WSContentSend_P(HTTP_FORM_END);
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-  WSContentStop();
-}
-
-void ModuleSaveSettings(void) {
-  char tmp[8];         // WebGetArg numbers only
-  WebGetArg(PSTR("g99"), tmp, sizeof(tmp));  // Module
-  uint32_t new_module = (!strlen(tmp)) ? MODULE : atoi(tmp);
-  Settings->last_module = Settings->module;
-  Settings->module = new_module;
-  SetModuleType();
-  myio template_gp;
-  TemplateGpios(&template_gp);
-  for (uint32_t i = 0; i < nitems(template_gp.io); i++) {
-    if (Settings->last_module != new_module) {
-      Settings->my_gp.io[i] = GPIO_NONE;
-    } else {
-      if (ValidGPIO(i, template_gp.io[i])) {
-        Settings->my_gp.io[i] = WebGetGpioArg(i);  // Gpio
-      }
-    }
-  }
-  char command[32];
-  snprintf_P(command, sizeof(command), PSTR(D_CMND_BACKLOG "0 " D_CMND_MODULE ";" D_CMND_GPIO));
-  ExecuteWebCommand(command);
+void HandleTest(void) {
+  Webserver->send(200, "text/plain", "Hello from esp8266 over HTTPS!");
 }
 
 /*-------------------------------------------------------------------------------------------*/
@@ -1533,8 +1096,6 @@ String HtmlEscape(const String unescaped) {
 
 void HandleWifiConfiguration(void) {
   char tmp[TOPSZ];  // Max length is currently 150
-
-  if (!HttpCheckPriviledgedAccess(!WifiIsInManagerMode())) { return; }
 
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_WIFI));
 
@@ -1784,156 +1345,8 @@ void WifiSaveSettings(void) {
 
 /*-------------------------------------------------------------------------------------------*/
 
-void HandleLoggingConfiguration(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_LOGGING));
-
-  if (Webserver->hasArg("save")) {
-    LoggingSaveSettings();
-    HandleConfiguration();
-    return;
-  }
-
-  WSContentStart_P(PSTR(D_CONFIGURE_LOGGING));
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_LOG1);
-  char stemp1[45];
-  char stemp2[32];
-  uint8_t dlevel[4] = { LOG_LEVEL_INFO, LOG_LEVEL_INFO, LOG_LEVEL_NONE, LOG_LEVEL_NONE };
-  for (uint32_t idx = 0; idx < 4; idx++) {
-    if ((2==idx) && !Settings->flag.mqtt_enabled) { continue; }  // SetOption3 - Enable MQTT
-    uint32_t llevel = (0==idx)?Settings->seriallog_level:(1==idx)?Settings->weblog_level:(2==idx)?Settings->mqttlog_level:Settings->syslog_level;
-    WSContentSend_P(PSTR("<p><b>%s</b> (%s)<br><select id='l%d'>"),
-      GetTextIndexed(stemp1, sizeof(stemp1), idx, kLoggingOptions),
-      GetTextIndexed(stemp2, sizeof(stemp2), dlevel[idx], kLoggingLevels),
-      idx);
-    for (uint32_t i = LOG_LEVEL_NONE; i <= LOG_LEVEL_DEBUG_MORE; i++) {
-      WSContentSend_P(PSTR("<option%s value='%d'>%d %s</option>"),
-        (i == llevel) ? PSTR(" selected") : "", i, i,
-        GetTextIndexed(stemp1, sizeof(stemp1), i, kLoggingLevels));
-    }
-    WSContentSend_P(PSTR("</select></p>"));
-  }
-  WSContentSend_P(HTTP_FORM_LOG2, SettingsText(SET_SYSLOG_HOST), Settings->syslog_port, Settings->tele_period);
-  WSContentSend_P(HTTP_FORM_END);
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-  WSContentStop();
-}
-
-void LoggingSaveSettings(void) {
-  String cmnd = F(D_CMND_BACKLOG "0 ");
-  cmnd += AddWebCommand(PSTR(D_CMND_SERIALLOG), PSTR("l0"), STR(SERIAL_LOG_LEVEL));
-  cmnd += AddWebCommand(PSTR(D_CMND_WEBLOG), PSTR("l1"), STR(WEB_LOG_LEVEL));
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTLOG), PSTR("l2"), STR(MQTT_LOG_LEVEL));
-  cmnd += AddWebCommand(PSTR(D_CMND_SYSLOG), PSTR("l3"), STR(SYS_LOG_LEVEL));
-  cmnd += AddWebCommand(PSTR(D_CMND_LOGHOST), PSTR("lh"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_LOGPORT), PSTR("lp"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_TELEPERIOD), PSTR("lt"), PSTR("1"));
-  ExecuteWebCommand((char*)cmnd.c_str());
-}
-
-/*-------------------------------------------------------------------------------------------*/
-
-void HandleOtherConfiguration(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_OTHER));
-
-  if (Webserver->hasArg(F("save"))) {
-    OtherSaveSettings();
-    WebRestart(1);
-    return;
-  }
-
-  WSContentStart_P(PSTR(D_CONFIGURE_OTHER));
-  WSContentSendStyle();
-
-  TemplateJson();
-#ifdef MQTT_DATA_STRING
-  WSContentSend_P(HTTP_FORM_OTHER, TasmotaGlobal.mqtt_data.c_str(), (USER_MODULE == Settings->module) ? PSTR(" checked disabled") : "",
-#else
-  WSContentSend_P(HTTP_FORM_OTHER, TasmotaGlobal.mqtt_data, (USER_MODULE == Settings->module) ? PSTR(" checked disabled") : "",
-#endif
-    (Settings->flag.mqtt_enabled) ? PSTR(" checked") : "",   // SetOption3 - Enable MQTT
-    SettingsText(SET_FRIENDLYNAME1), SettingsText(SET_DEVICENAME));
-
-  char stemp[32];
-  uint32_t maxfn = (TasmotaGlobal.devices_present > MAX_FRIENDLYNAMES) ? MAX_FRIENDLYNAMES : (!TasmotaGlobal.devices_present) ? 1 : TasmotaGlobal.devices_present;
-#ifdef USE_SONOFF_IFAN
-  if (IsModuleIfan()) { maxfn = 1; }
-#endif  // USE_SONOFF_IFAN
-  for (uint32_t i = 0; i < maxfn; i++) {
-    snprintf_P(stemp, sizeof(stemp), PSTR("%d"), i +1);
-    WSContentSend_P(PSTR("<b>" D_FRIENDLY_NAME " %d</b> (" FRIENDLY_NAME "%s)<br><input id='a%d' placeholder=\"" FRIENDLY_NAME "%s\" value=\"%s\"><p></p>"),
-      i +1,
-      (i) ? stemp : "",
-      i,
-      (i) ? stemp : "",
-      SettingsText(SET_FRIENDLYNAME1 + i));
-  }
-
-#ifdef USE_EMULATION
-#if defined(USE_EMULATION_WEMO) || defined(USE_EMULATION_HUE)
-  WSContentSend_P(PSTR("<p></p><fieldset><legend><b>&nbsp;" D_EMULATION "&nbsp;</b></legend><p>"));  // Keep close to Friendlynames so do not use <br>
-  for (uint32_t i = 0; i < EMUL_MAX; i++) {
-#ifndef USE_EMULATION_WEMO
-    if (i == EMUL_WEMO) { i++; }
-#endif
-#ifndef USE_EMULATION_HUE
-    if (i == EMUL_HUE) { i++; }
-#endif
-    if (i < EMUL_MAX) {
-      WSContentSend_P(PSTR("<input id='r%d' name='b2' type='radio' value='%d'%s><b>%s</b> %s<br>"),  // Different id only used for labels
-        i, i,
-        (i == Settings->flag2.emulation) ? PSTR(" checked") : "",
-        GetTextIndexed(stemp, sizeof(stemp), i, kEmulationOptions),
-        (i == EMUL_NONE) ? "" : (i == EMUL_WEMO) ? PSTR(D_SINGLE_DEVICE) : PSTR(D_MULTI_DEVICE));
-    }
-  }
-  WSContentSend_P(PSTR("</p></fieldset>"));
-#endif  // USE_EMULATION_WEMO || USE_EMULATION_HUE
-#endif  // USE_EMULATION
-
-  WSContentSend_P(HTTP_FORM_END);
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-  WSContentStop();
-}
-
-void OtherSaveSettings(void) {
-  String cmnd = F(D_CMND_BACKLOG "0 ");
-  cmnd += AddWebCommand(PSTR(D_CMND_WEBPASSWORD "2"), PSTR("wp"), PSTR("\""));
-  cmnd += F(";" D_CMND_SO "3 ");
-  cmnd += Webserver->hasArg(F("b1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_DEVICENAME), PSTR("dn"), PSTR("\""));
-  char webindex[5];
-  char cmnd2[24];                             // ";Module 0;Template "
-  for (uint32_t i = 0; i < MAX_FRIENDLYNAMES; i++) {
-    snprintf_P(webindex, sizeof(webindex), PSTR("a%d"), i);
-    snprintf_P(cmnd2, sizeof(cmnd2), PSTR(D_CMND_FN "%d"), i +1);
-    cmnd += AddWebCommand(cmnd2, webindex, PSTR("\""));
-  }
-
-#ifdef USE_EMULATION
-#if defined(USE_EMULATION_WEMO) || defined(USE_EMULATION_HUE)
-  cmnd += AddWebCommand(PSTR(D_CMND_EMULATION), PSTR("b2"), PSTR("0"));
-#endif  // USE_EMULATION_WEMO || USE_EMULATION_HUE
-#endif  // USE_EMULATION
-
-  String tmpl = Webserver->arg(F("t1"));    // {"NAME":"12345678901234","GPIO":[255,255,255,255,255,255,255,255,255,255,255,255,255],"FLAG":255,"BASE":255,"CMND":"SO123 1;SO99 0"}
-  if (tmpl.length() && (tmpl.length() < MQTT_MAX_PACKET_SIZE)) {
-    snprintf_P(cmnd2, sizeof(cmnd2), PSTR(";%s" D_CMND_TEMPLATE " "), (Webserver->hasArg(F("t2"))) ? PSTR(D_CMND_MODULE " 0;") : "");
-    cmnd += cmnd2 + tmpl;
-  }
-  ExecuteWebCommand((char*)cmnd.c_str());
-}
-
-/*-------------------------------------------------------------------------------------------*/
-
 void HandleBackupConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_BACKUP_CONFIGURATION));
 
   uint32_t config_len = SettingsConfigBackup();
@@ -1956,8 +1369,6 @@ void HandleBackupConfiguration(void)
 
 void HandleResetConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess(!WifiIsInManagerMode())) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_RESET_CONFIGURATION));
 
   WSContentStart_P(PSTR(D_RESET_CONFIGURATION), !WifiIsInManagerMode());
@@ -1974,8 +1385,6 @@ void HandleResetConfiguration(void)
 
 void HandleFactoryResetConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess(!WifiIsInManagerMode())) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR("공장 초기화 중..."));
 
   WSContentStart_P(PSTR("공장 초기화"), !WifiIsInManagerMode());
@@ -1992,8 +1401,6 @@ void HandleFactoryResetConfiguration(void)
 
 void HandleRestoreConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_RESTORE_CONFIGURATION));
 
   WSContentStart_P(PSTR(D_RESTORE_CONFIGURATION));
@@ -2014,8 +1421,6 @@ void HandleRestoreConfiguration(void)
 
 void HandleInformation(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   float freemem = ((float)ESP_getFreeHeap()) / 1024;
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_INFORMATION));
 
@@ -2149,8 +1554,8 @@ void HandleInformation(void)
   WSContentSend_PD(PSTR("}1" D_FREE_MEMORY "}2%1_f kB"), &freemem);
 #endif // ESP32
   WSContentSend_P(PSTR("</td></tr></table>"));
-  WSContentSend_P("\";s=o.replace(/}1/g,\"</td></tr><tr><th>\").replace(/}2/g,\"</th><td>\");eb('hide').innerHTML=s;}wl(hide);</script>");
-  WSContentSend_P("<div id='hide' name='hide'></div>");
+  WSContentSend_P(PSTR("\";s=o.replace(/}1/g,\"</td></tr><tr><th>\").replace(/}2/g,\"</th><td>\");eb('hide').innerHTML=s;}wl(hide);</script>"));
+  WSContentSend_P(PSTR("<div id='hide' name='hide'></div>"));
   WSContentSend_P(PSTR("</div>"));
 
   WSContentSpaceButton(BUTTON_MAIN);
@@ -2207,8 +1612,6 @@ uint32_t BUploadWriteBuffer(uint8_t *buf, size_t size) {
 #endif  // USE_WEB_FW_UPGRADE
 
 void HandleUpgradeFirmware(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_FIRMWARE_UPGRADE));
 
   WSContentStart_P(PSTR(D_FIRMWARE_UPGRADE));
@@ -2222,8 +1625,6 @@ void HandleUpgradeFirmware(void) {
 }
 
 void HandleUpgradeFirmwareStart(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   char command[TOPSZ + 10];  // OtaUrl
 
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_UPGRADE_STARTED));
@@ -2249,8 +1650,6 @@ void HandleUpgradeFirmwareStart(void) {
 }
 
 void HandleUploadDone(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
 #if defined(USE_ZIGBEE_EZSP)
   if ((UPL_EFR32 == Web.upload_file_type) && !Web.upload_error && BUpload.ready) {
     BUpload.ready = false;  //  Make sure not to follow thru again
@@ -2589,24 +1988,7 @@ void HandlePreflightRequest(void)
 
 void HandleHttpCommand(void)
 {
-  if (!HttpCheckPriviledgedAccess(false)) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_COMMAND));
-
-  if (!WebAuthenticate()) {
-    // Prefer authorization via HTTP header (Basic auth), if it fails, use legacy method via GET parameters
-    char tmp1[33];
-    WebGetArg(PSTR("user"), tmp1, sizeof(tmp1));
-    char tmp2[strlen(SettingsText(SET_WEBPWD)) + 2];  // Need space for an entered password longer than set password
-    WebGetArg(PSTR("password"), tmp2, sizeof(tmp2));
-
-    if (!(!strcmp(tmp1, WEB_USERNAME) && !strcmp(tmp2, SettingsText(SET_WEBPWD)))) {
-      WSContentBegin(401, CT_APP_JSON);
-      WSContentSend_P(PSTR("{\"" D_RSLT_WARNING "\":\"" D_NEED_USER_AND_PASSWORD "\"}"));
-      WSContentEnd();
-      return;
-    }
-  }
 
   WSContentBegin(200, CT_APP_JSON);
   String svalue = Webserver->arg(F("cmnd"));
@@ -2634,80 +2016,6 @@ void HandleHttpCommand(void)
   } else {
     WSContentSend_P(PSTR("{\"" D_RSLT_WARNING "\":\"" D_ENTER_COMMAND " cmnd=\"}"));
   }
-  WSContentEnd();
-}
-
-/*-------------------------------------------------------------------------------------------*/
-
-void HandleManagement(void)
-{
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_MANAGEMENT));
-
-  WSContentStart_P(PSTR(D_MANAGEMENT));
-  WSContentSendStyle();
-
-  WSContentButton(BUTTON_CONSOLE);
-
-  XdrvMailbox.index = 0;
-  XdrvCall(FUNC_WEB_ADD_CONSOLE_BUTTON);
-  XsnsCall(FUNC_WEB_ADD_CONSOLE_BUTTON);
-
-  WSContentSend_P(PSTR("<div></div>"));            // 5px padding
-  XdrvCall(FUNC_WEB_ADD_MANAGEMENT_BUTTON);
-
-  WSContentSpaceButton(BUTTON_MAIN);
-  WSContentStop();
-}
-
-void HandleConsole(void)
-{
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
-  if (Webserver->hasArg(F("c2"))) {      // Console refresh requested
-    HandleConsoleRefresh();
-    return;
-  }
-
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONSOLE));
-
-  WSContentStart_P(PSTR(D_CONSOLE));
-  WSContentSend_P(HTTP_SCRIPT_CONSOL, Settings->web_refresh);
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_CMND);
-  WSContentSpaceButton((WebUseManagementSubmenu()) ? BUTTON_MANAGEMENT : BUTTON_MAIN);
-  WSContentStop();
-}
-
-void HandleConsoleRefresh(void)
-{
-  String svalue = Webserver->arg(F("c1"));
-  if (svalue.length() && (svalue.length() < MQTT_MAX_PACKET_SIZE)) {
-    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_COMMAND "%s"), svalue.c_str());
-    ExecuteWebCommand((char*)svalue.c_str(), SRC_WEBCONSOLE);
-  }
-
-  char stmp[8];
-  WebGetArg(PSTR("c2"), stmp, sizeof(stmp));
-  uint32_t index = 0;                // Initial start, dump all
-  if (strlen(stmp)) { index = atoi(stmp); }
-
-  WSContentBegin(200, CT_PLAIN);
-  WSContentSend_P(PSTR("%d}1%d}1"), TasmotaGlobal.log_buffer_pointer, Web.reset_web_log_flag);
-  if (!Web.reset_web_log_flag) {
-    index = 0;
-    Web.reset_web_log_flag = true;
-  }
-  bool cflg = (index);
-  char* line;
-  size_t len;
-  while (GetLog(Settings->weblog_level, &index, &line, &len)) {
-    if (cflg) { WSContentSend_P(PSTR("\n")); }
-    WSContentSend(line, len -1);
-    cflg = true;
-  }
-  WSContentSend_P(PSTR("}1"));
   WSContentEnd();
 }
 
@@ -2920,7 +2228,7 @@ const char kWebCommands[] PROGMEM = "|"  // No prefix
 #if defined(USE_SENDMAIL) || defined(USE_ESP32MAIL)
   D_CMND_SENDMAIL "|"
 #endif
-  D_CMND_WEBSERVER "|" D_CMND_WEBPASSWORD "|" D_CMND_WEBLOG "|" D_CMND_WEBREFRESH "|" D_CMND_WEBSEND "|" D_CMND_WEBCOLOR "|"
+  D_CMND_WEBSERVER "|" D_CMND_WEBREFRESH "|" D_CMND_WEBSEND "|"
   D_CMND_WEBSENSOR "|" D_CMND_WEBBUTTON "|" D_CMND_CORS;
 
 void (* const WebCommand[])(void) PROGMEM = {
@@ -2930,7 +2238,7 @@ void (* const WebCommand[])(void) PROGMEM = {
 #if defined(USE_SENDMAIL) || defined(USE_ESP32MAIL)
   &CmndSendmail,
 #endif
-  &CmndWebServer, &CmndWebPassword, &CmndWeblog, &CmndWebRefresh, &CmndWebSend, &CmndWebColor,
+  &CmndWebServer, &CmndWebRefresh, &CmndWebSend,
   &CmndWebSensor, &CmndWebButton, &CmndCors };
 
 /*********************************************************************************************\
@@ -2984,30 +2292,6 @@ void CmndWebServer(void)
   }
 }
 
-void CmndWebPassword(void)
-{
-  bool show_asterisk = (2 == XdrvMailbox.index);
-  if (XdrvMailbox.data_len > 0) {
-    SettingsUpdateText(SET_WEBPWD, (SC_CLEAR == Shortcut()) ? "" : (SC_DEFAULT == Shortcut()) ? WEB_PASSWORD : XdrvMailbox.data);
-    if (!show_asterisk) {
-      ResponseCmndChar(SettingsText(SET_WEBPWD));
-    }
-  } else {
-    show_asterisk = true;
-  }
-  if (show_asterisk) {
-    Response_P(S_JSON_COMMAND_ASTERISK, XdrvMailbox.command);
-  }
-}
-
-void CmndWeblog(void)
-{
-  if ((XdrvMailbox.payload >= LOG_LEVEL_NONE) && (XdrvMailbox.payload <= LOG_LEVEL_DEBUG_MORE)) {
-    Settings->weblog_level = XdrvMailbox.payload;
-  }
-  ResponseCmndNumber(Settings->weblog_level);
-}
-
 void CmndWebRefresh(void)
 {
   if ((XdrvMailbox.payload > 999) && (XdrvMailbox.payload <= 65000)) {
@@ -3023,31 +2307,6 @@ void CmndWebSend(void)
     char stemp1[20];
     ResponseCmndChar(GetTextIndexed(stemp1, sizeof(stemp1), result, kWebSendStatus));
   }
-}
-
-void CmndWebColor(void)
-{
-  if (XdrvMailbox.data_len > 0) {
-    if (strchr(XdrvMailbox.data, '{') == nullptr) {  // If no JSON it must be parameter
-      if ((XdrvMailbox.data_len > 3) && (XdrvMailbox.index > 0) && (XdrvMailbox.index <= COL_LAST)) {
-        WebHexCode(XdrvMailbox.index -1, XdrvMailbox.data);
-      }
-      else if (0 == XdrvMailbox.payload) {
-        SettingsDefaultWebColor();
-      }
-    }
-    else {
-#ifndef FIRMWARE_MINIMAL      // if tasmota-minimal, read only and don't parse JSON
-      JsonWebColor(XdrvMailbox.data);
-#endif // FIRMWARE_MINIMAL
-    }
-  }
-  Response_P(PSTR("{\"" D_CMND_WEBCOLOR "\":["));
-  for (uint32_t i = 0; i < COL_LAST; i++) {
-    if (i) { ResponseAppend_P(PSTR(",")); }
-    ResponseAppend_P(PSTR("\"#%06x\""), WebColor(i));
-  }
-  ResponseAppend_P(PSTR("]}"));
 }
 
 void CmndWebSensor(void)

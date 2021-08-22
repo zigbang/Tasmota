@@ -1345,7 +1345,7 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
-      MqttCheck();
+      //MqttCheck();
     } else {
 #ifdef USE_EMULATION
       UdpDisconnect();
@@ -1378,9 +1378,6 @@ void ArduinoOTAInit(void)
 {
   ArduinoOTA.setPort(8266);
   ArduinoOTA.setHostname(NetworkHostname());
-  if (strlen(SettingsText(SET_WEBPWD))) {
-    ArduinoOTA.setPassword(SettingsText(SET_WEBPWD));
-  }
 
   ArduinoOTA.onStart([]()
   {

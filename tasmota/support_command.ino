@@ -52,7 +52,7 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
   &CmndVoltageResolution, &CmndFrequencyResolution, &CmndCurrentResolution, &CmndEnergyResolution, &CmndWeightResolution,
   &CmndModule, &CmndModules, &CmndGpio, &CmndGpios, &CmndTemplate, &CmndPwm, &CmndPwmfrequency, &CmndPwmrange,
   &CmndButtonDebounce, &CmndSwitchDebounce, &CmndSyslog, &CmndLoghost, &CmndLogport,
-  &CmndSerialBuffer, &CmndSerialSend, &CmndBaudrate, &CmndSerialConfig, &CmndSerialDelimiter,
+  &CmndSerialSend, &CmndBaudrate, &CmndSerialConfig, &CmndSerialDelimiter,
   &CmndIpAddress, &CmndNtpServer, &CmndAp, &CmndSsid, &CmndPassword, &CmndHostname, &CmndWifiConfig, &CmndWifi,
   &CmndDevicename, &CmndFriendlyname, &CmndFriendlyname, &CmndSwitchMode, &CmndInterlock, &CmndTeleperiod, &CmndReset, &CmndTime, &CmndTimezone, &CmndTimeStd,
   &CmndTimeDst, &CmndAltitude, &CmndLedPower, &CmndLedState, &CmndLedMask, &CmndLedPwmOn, &CmndLedPwmOff, &CmndLedPwmMode,
@@ -525,10 +525,10 @@ void CmndStatus(void)
   }
 
   if ((0 == payload) || (3 == payload)) {
-    Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS3_LOGGING "\":{\"" D_CMND_SERIALLOG "\":%d,\"" D_CMND_WEBLOG "\":%d,\"" D_CMND_MQTTLOG "\":%d,\"" D_CMND_SYSLOG "\":%d,\""
+    Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS3_LOGGING "\":{\"" D_CMND_SERIALLOG "\":%d,\"" D_CMND_MQTTLOG "\":%d,\"" D_CMND_SYSLOG "\":%d,\""
                           D_CMND_LOGHOST "\":\"%s\",\"" D_CMND_LOGPORT "\":%d,\"" D_CMND_SSID "\":[\"%s\",\"%s\"],\"" D_CMND_TELEPERIOD "\":%d,\""
                           D_JSON_RESOLUTION "\":\"%08X\",\"" D_CMND_SETOPTION "\":[\"%08X\",\"%s\",\"%08X\",\"%08X\",\"%08X\"]}}"),
-                          Settings->seriallog_level, Settings->weblog_level, Settings->mqttlog_level, Settings->syslog_level,
+                          Settings->seriallog_level, Settings->mqttlog_level, Settings->syslog_level,
                           SettingsText(SET_SYSLOG_HOST), Settings->syslog_port, EscapeJSONString(SettingsText(SET_STASSID1)).c_str(), EscapeJSONString(SettingsText(SET_STASSID2)).c_str(), Settings->tele_period,
                           Settings->flag2.data, Settings->flag.data, ToHex_P((unsigned char*)Settings->param, PARAM8_SIZE, stemp2, sizeof(stemp2)),
                           Settings->flag3.data, Settings->flag4.data, Settings->flag5.data);
@@ -1541,32 +1541,6 @@ void CmndSerialConfig(void)
     }
   }
   ResponseCmndChar(GetSerialConfig().c_str());
-}
-
-void CmndSerialBuffer(void) {
-  // Allow non-pesistent serial receive buffer size change
-  //   between 256 (default) and 520 (INPUT_BUFFER_SIZE) characters
-  size_t size = 0;
-  if (XdrvMailbox.data_len > 0) {
-    size = XdrvMailbox.payload;
-    if (XdrvMailbox.payload < 256) {
-      size = 256;
-    }
-    if ((1 == XdrvMailbox.payload) || (XdrvMailbox.payload > INPUT_BUFFER_SIZE)) {
-      size = INPUT_BUFFER_SIZE;
-    }
-    Serial.setRxBufferSize(size);
-  }
-#ifdef ESP8266
-  ResponseCmndNumber(Serial.getRxBufferSize());
-#endif
-#ifdef ESP32
-  if (size) {
-    ResponseCmndNumber(size);
-  } else {
-    ResponseCmndDone();
-  }
-#endif
 }
 
 void CmndSerialSend(void)
