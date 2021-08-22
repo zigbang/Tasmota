@@ -470,6 +470,15 @@ void StartWebserverSecure(void)
   }
 }
 
+void StopWebserverSecure(void)
+{
+  if (Web.state_HTTPS) {
+    WebserverSecure->close();
+    Web.state_HTTPS = false;
+    AddLog(LOG_LEVEL_INFO, F("HTTPS 웹서버 종료"));
+  }
+}
+
 // replace the series of `Webserver->on()` with a table in PROGMEM
 typedef struct WebServerDispatch_t {
   char uri[3];   // the prefix "/" is added automatically
