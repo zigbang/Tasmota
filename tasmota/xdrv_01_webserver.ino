@@ -332,14 +332,14 @@ const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:cente
 
 enum ButtonTitle {
   BUTTON_RESTART, BUTTON_RESET_CONFIGURATION, BUTTON_FACTORY_RESET,
-  BUTTON_MAIN, BUTTON_COGNITO_LOGIN, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_WIFI, BUTTON_BACKUP, BUTTON_RESTORE };
+  BUTTON_MAIN, BUTTON_COGNITO_LOGIN, BUTTON_COGNITO_LOGOUT, BUTTON_CONFIGURATION, BUTTON_INFORMATION, BUTTON_FIRMWARE_UPGRADE, BUTTON_WIFI, BUTTON_BACKUP, BUTTON_RESTORE };
 const char kButtonTitle[] PROGMEM =
   D_RESTART "|" D_RESET_CONFIGURATION "|" "공장 초기화" "|"
-  D_MAIN_MENU "|" "로그인" "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|"
+  D_MAIN_MENU "|" "로그인" "|" "로그아웃" "|" D_CONFIGURATION "|" D_INFORMATION "|" D_FIRMWARE_UPGRADE "|"
   D_CONFIGURE_WIFI "|" D_BACKUP_CONFIGURATION "|" D_RESTORE_CONFIGURATION "|";
 const char kButtonAction[] PROGMEM =
   ".|rt|frt|"
-  ".|lo|cn|in|up|"
+  ".|li|lo|cn|in|up|"
   "wi|dl|rs|";
 
 const char kButtonConfirm[] PROGMEM = D_CONFIRM_RESTART "|" D_CONFIRM_RESET_CONFIGURATION "|" "공장 초기화 확인";
@@ -369,6 +369,7 @@ struct WEB {
   bool upload_services_stopped = false;
   bool initial_config = false;
   bool state_HTTPS = false;
+  bool state_login = false;
   uint8_t wifiTest = WIFI_NOT_TESTING;
   uint8_t wifi_test_counter = 0;
   uint16_t save_data_counter = 0;
@@ -532,7 +533,7 @@ void StartWebserver(int type, IPAddress ipweb)
       Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
       Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
-      Webserver->on(F("/lo"), HTTP_GET, HandleCognitoLogin);
+      Webserver->on(F("/li"), HTTP_GET, HandleCognitoLogin);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -935,6 +936,7 @@ void HandleCognitoLogin(void)
 
 void HandleCognitoLoginCode(void)
 {
+  Web.state_login = true;
   Serial.print("========================= Cognito code is ");
   Serial.println(WebserverSecure->arg("code"));
   WebserverSecure->sendHeader(F("Location"), String(F("http://")) + WebserverSecure->client().localIP().toString(), true);
@@ -1033,7 +1035,8 @@ void HandleRoot(void)
 #endif  // Not FIRMWARE_MINIMAL
 
   if (HTTP_ADMIN == Web.state) {
-    WSContentSpaceButton(BUTTON_COGNITO_LOGIN);
+    if (!Web.state_login) { WSContentSpaceButton(BUTTON_COGNITO_LOGIN); }
+    else { WSContentSpaceButton(BUTTON_COGNITO_LOGOUT); }
     WSContentSpaceButton(BUTTON_CONFIGURATION);
     WSContentButton(BUTTON_INFORMATION);
     WSContentButton(BUTTON_RESTART);
