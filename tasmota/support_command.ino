@@ -52,7 +52,7 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
   &CmndVoltageResolution, &CmndFrequencyResolution, &CmndCurrentResolution, &CmndEnergyResolution, &CmndWeightResolution,
   &CmndModule, &CmndModules, &CmndGpio, &CmndGpios, &CmndTemplate, &CmndPwm, &CmndPwmfrequency, &CmndPwmrange,
   &CmndButtonDebounce, &CmndSwitchDebounce, &CmndSyslog, &CmndLoghost, &CmndLogport,
-  &CmndSerialSend, &CmndBaudrate, &CmndSerialConfig, &CmndSerialDelimiter,
+  &CmndSerialBuffer, &CmndSerialSend, &CmndBaudrate, &CmndSerialConfig, &CmndSerialDelimiter,
   &CmndIpAddress, &CmndNtpServer, &CmndAp, &CmndSsid, &CmndPassword, &CmndHostname, &CmndWifiConfig, &CmndWifi,
   &CmndDevicename, &CmndFriendlyname, &CmndFriendlyname, &CmndSwitchMode, &CmndInterlock, &CmndTeleperiod, &CmndReset, &CmndTime, &CmndTimezone, &CmndTimeStd,
   &CmndTimeDst, &CmndAltitude, &CmndLedPower, &CmndLedState, &CmndLedMask, &CmndLedPwmOn, &CmndLedPwmOff, &CmndLedPwmMode,
@@ -1541,6 +1541,32 @@ void CmndSerialConfig(void)
     }
   }
   ResponseCmndChar(GetSerialConfig().c_str());
+}
+
+void CmndSerialBuffer(void) {
+  // Allow non-pesistent serial receive buffer size change
+  //   between 256 (default) and 520 (INPUT_BUFFER_SIZE) characters
+  size_t size = 0;
+  if (XdrvMailbox.data_len > 0) {
+    size = XdrvMailbox.payload;
+    if (XdrvMailbox.payload < 256) {
+      size = 256;
+    }
+    if ((1 == XdrvMailbox.payload) || (XdrvMailbox.payload > INPUT_BUFFER_SIZE)) {
+      size = INPUT_BUFFER_SIZE;
+    }
+    Serial.setRxBufferSize(size);
+  }
+#ifdef ESP8266
+  ResponseCmndNumber(Serial.getRxBufferSize());
+#endif
+#ifdef ESP32
+  if (size) {
+    ResponseCmndNumber(size);
+  } else {
+    ResponseCmndDone();
+  }
+#endif
 }
 
 void CmndSerialSend(void)
