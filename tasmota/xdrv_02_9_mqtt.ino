@@ -1922,7 +1922,7 @@ bool Xdrv02(uint8_t function)
         result = DecodeCommand(kMqttCommands, MqttCommand, kMqttSynonyms);
         break;
       case FUNC_PRE_INIT:
-        //MqttInit();
+        MqttInit();
         break;
     }
   }
