@@ -61,6 +61,7 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
 #include <ESP8266WebServerSecure.h>
+#include <base64.hpp>
 
 const char HTTP_SCRIPT_ROOT2[] PROGMEM =
   "var rfsh=1,ft;"
@@ -452,35 +453,6 @@ void ExecuteWebCommand(char* svalue) {
   ExecuteWebCommand(svalue, SRC_WEBGUI);
 }
 
-void StartWebserverSecure(void)
-{
-  if (!Web.state_HTTPS) {
-    if (!WebserverSecure) {
-      WebserverSecure = new ESP8266WebServerSecure(443);
-      WebserverSecure->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
-      WebserverSecure->getServer().setBufferSizes(1024, 1024);
-      WebserverSecure->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
-    }
-
-    WebserverSecure->begin(); // Web server start
-  }
-  if (!Web.state_HTTPS) {
-    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I"),
-      NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", (uint32_t)WiFi.localIP());
-    Web.state_HTTPS = true;
-  }
-}
-
-// TODO: 메모리 회수 코드 추가
-void StopWebserverSecure(void)
-{
-  if (Web.state_HTTPS) {
-    WebserverSecure->close();
-    Web.state_HTTPS = false;
-    AddLog(LOG_LEVEL_INFO, PSTR("HTTPS 웹서버 종료"));
-  }
-}
-
 // replace the series of `Webserver->on()` with a table in PROGMEM
 typedef struct WebServerDispatch_t {
   char uri[3];   // the prefix "/" is added automatically
@@ -529,9 +501,6 @@ void StartWebserver(int type, IPAddress ipweb)
         // register
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
-      Webserver->on(F("/info"), HTTP_GET, HandleDeviceInfo);
-      Webserver->on(F("/certs"), HTTP_GET, HandleCertsInfo);
-      Webserver->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
       Webserver->on(F("/li"), HTTP_GET, HandleCognitoLogin);
       Webserver->onNotFound(HandleNotFound);
@@ -929,19 +898,8 @@ void WebRestart(uint32_t type)
 
 void HandleCognitoLogin(void)
 {
-  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=openid&redirect_uri=https://192.168.219.105/lc")), true);
+  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=aws.cognito.signin.user.admin+openid&redirect_uri=https://192.168.219.105/lc")), true);
   WSSend(302, CT_PLAIN, "");  // Empty content inhibits Content-length header so we have to close the socket ourselves.
-  StartWebserverSecure();
-}
-
-void HandleCognitoLoginCode(void)
-{
-  Web.state_login = true;
-  Serial.print("========================= Cognito code is ");
-  Serial.println(WebserverSecure->arg("code"));
-  WebserverSecure->sendHeader(F("Location"), String(F("http://")) + WebserverSecure->client().localIP().toString(), true);
-  WebserverSecure->send(302, "text/plain", "");
-  StopWebserverSecure();
 }
 
 void HandleWifiLogin(void)
@@ -1418,7 +1376,7 @@ void HandleFactoryResetConfiguration(void)
 
   WSContentStart_P(PSTR("공장 초기화"), !WifiIsInManagerMode());
   WSContentSendStyle();
-  WSContentSend_P(PSTR("<div style='text-align:center;'>" D_CONFIGURATION_RESET "</div>"));
+  WSContentSend_P(PSTR("<div style='text-align:center;'>공장 초기화</div>"));
   WSContentSend_P(HTTP_MSG_RSTRT);
   WSContentSpaceButton(BUTTON_MAIN);
   WSContentStop();
@@ -2093,59 +2051,6 @@ bool CaptivePortal(void)
 #endif  // NO_CAPTIVE_PORTAL
 
 /*********************************************************************************************/
-
-void HandleDeviceInfo(void) {
-  WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"%s\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str(), DEVICE_TYPE);
-  WSContentEnd();
-}
-
-void HandleCertsInfo(void) {
-  if ((strlen(AmazonClientCert) == 0) || strlen(AmazonPrivateKey) == 0) {
-    WSContentBegin(500, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
-    WSContentEnd();
-    return;
-  }
-
-  WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":{\"cert\":\"%s\", \"key\":\"%s\"}}"), AmazonClientCert, AmazonPrivateKey);
-  WSContentEnd();
-}
-
-void HandleCertsConfiguration(void) {
-  if(!Webserver->hasArg(F("plain"))) {
-    WSContentBegin(500, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
-    WSContentEnd();
-    return;
-  }
-
-  JsonParser parser((char*) Webserver->arg("plain").c_str());
-  JsonParserObject stateObject = parser.getRootObject();
-  String cert = stateObject["cert"].getStr();
-  String key = stateObject["key"].getStr();
-  char* certCharType = (char*)cert.c_str();
-  char* keyCharType = (char*)key.c_str();
-
-/* TODO: 인증서 사이즈 체크 예외코드 작성
-  if(cert.length() != 256 || key.length() < 10) {
-    WSContentBegin(500, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
-    WSContentEnd();
-    return;
-  }
-*/
-  memcpy(AmazonClientCert, certCharType, strlen(certCharType));
-  memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
-  MqttDisconnect();
-  ConvertTlsFile(0);
-  ConvertTlsFile(1);
-
-  WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
-  WSContentEnd();
-}
 
 int WebSend(char *buffer)
 {
