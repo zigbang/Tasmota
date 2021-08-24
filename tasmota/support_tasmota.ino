@@ -1315,7 +1315,10 @@ void Every250mSeconds(void)
       if (Settings->webserver) {
 
 #ifdef ESP8266
-        if (!WifiIsInManagerMode()) { StartWebserver(Settings->webserver, WiFi.localIP()); }
+        if (!WifiIsInManagerMode()) {
+          StartWebserver(Settings->webserver, WiFi.localIP());
+          StartWebserverSecure();
+        }
 #endif  // ESP8266
 #ifdef ESP32
 #ifdef USE_ETHERNET
@@ -1328,6 +1331,7 @@ void Every250mSeconds(void)
         MdnsAddServiceHttp();
       } else {
         StopWebserver();
+        StopWebserverSecure();
       }
 #ifdef USE_EMULATION
       if (Settings->flag2.emulation) { UdpConnect(); }
@@ -1345,7 +1349,7 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
-      //MqttCheck();
+      MqttCheck();
     } else {
 #ifdef USE_EMULATION
       UdpDisconnect();
