@@ -13,6 +13,7 @@ void StartWebserverSecure(void)
       WebserverSecure->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
       WebserverSecure->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
       WebserverSecure->on(F("/info"), HTTP_GET, HandleDeviceInfo);
+      WebserverSecure->on(F("/wifi"), HTTP_POST, HandleWifiConfigurationWithApp);
     }
 
     WebserverSecure->begin(); // Web server start
@@ -344,6 +345,36 @@ void HandleCertsConfiguration(void) {
   MqttDisconnect();
   ConvertTlsFile(0);
   ConvertTlsFile(1);
+
+  WSContentBeginSecure(200, CT_APP_JSON);
+  WSContentSend_PSecure(PSTR("{\"message\":\"Success\"}"));
+  WSContentEndSecure();
+}
+
+void HandleWifiConfigurationWithApp(void) {
+  if(!WebserverSecure->hasArg(F("plain"))) {
+    WSContentBeginSecure(500, CT_APP_JSON);
+    WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
+    WSContentEndSecure();
+    return;
+  }
+
+  JsonParser parser((char*) WebserverSecure->arg("plain").c_str());
+  JsonParserObject stateObject = parser.getRootObject();
+
+  String ssid = stateObject["ssid1"].getStr();
+  String pwd = stateObject["pwd1"].getStr();
+  if (ssid.length() || pwd.length()) {
+    SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
+    SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
+  }
+
+  ssid = stateObject["ssid2"].getStr();
+  pwd = stateObject["pwd2"].getStr();
+  if (ssid.length() || pwd.length()) {
+    SettingsUpdateText(SET_STASSID2, (char*)ssid.c_str());
+    SettingsUpdateText(SET_STAPWD2, (char*)pwd.c_str());
+  }
 
   WSContentBeginSecure(200, CT_APP_JSON);
   WSContentSend_PSecure(PSTR("{\"message\":\"Success\"}"));
