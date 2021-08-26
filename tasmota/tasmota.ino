@@ -393,6 +393,9 @@ void setup(void) {
     SettingsUpdateText(SET_HOSTNAME, TasmotaGlobal.hostname);
   }
 
+  mac_address.~String();
+  mac_part.~String();
+
   RtcInit();
   GpioInit();
   ButtonInit();

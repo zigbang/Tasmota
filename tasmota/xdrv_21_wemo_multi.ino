@@ -429,33 +429,33 @@ void WemoRespondToMSearch(int echo_type) {
 
 bool Xdrv21(uint8_t function)
 {
-  bool result = false;
+//   bool result = false;
 
-  if (TasmotaGlobal.devices_present && (EMUL_WEMO == Settings->flag2.emulation)) {
-    switch (function) {
-      case FUNC_LOOP:
-        for (uint32_t i = 1; i < numOfWemoSwitch; i++) { // Handle devices web server
-          wemoDevice[i]->HandleServerLoop();
-        }
-        break;
-      case FUNC_WEB_ADD_HANDLER:
-#ifdef USE_EMULATION_WEMO_DEBUG
-        AddLog(LOG_LEVEL_DEBUG, PSTR("WMO: Adding handlers for %d devices"), TasmotaGlobal.devices_present);
-#endif
-        // For the first device use the current webserver, for the others.. create a new one listening on a different PortUdp
-        wemoDevice[numOfWemoSwitch] = new WemoSwitch(1, Webserver);
-        wemoDevice[numOfWemoSwitch]->RegisterHandlers();
-        numOfWemoSwitch++;
+//   if (TasmotaGlobal.devices_present && (EMUL_WEMO == Settings->flag2.emulation)) {
+//     switch (function) {
+//       case FUNC_LOOP:
+//         for (uint32_t i = 1; i < numOfWemoSwitch; i++) { // Handle devices web server
+//           wemoDevice[i]->HandleServerLoop();
+//         }
+//         break;
+//       case FUNC_WEB_ADD_HANDLER:
+// #ifdef USE_EMULATION_WEMO_DEBUG
+//         AddLog(LOG_LEVEL_DEBUG, PSTR("WMO: Adding handlers for %d devices"), TasmotaGlobal.devices_present);
+// #endif
+//         // For the first device use the current webserver, for the others.. create a new one listening on a different PortUdp
+//         wemoDevice[numOfWemoSwitch] = new WemoSwitch(1, Webserver);
+//         wemoDevice[numOfWemoSwitch]->RegisterHandlers();
+//         numOfWemoSwitch++;
 
-        for (uint32_t i = 1; i < TasmotaGlobal.devices_present; i++) {
-          wemoDevice[numOfWemoSwitch] = new WemoSwitch(i + 1, 8080 + i);
-          wemoDevice[numOfWemoSwitch]->RegisterHandlers();
-          numOfWemoSwitch++;
-        }
-        break;
-    }
-  }
-  return result;
+//         for (uint32_t i = 1; i < TasmotaGlobal.devices_present; i++) {
+//           wemoDevice[numOfWemoSwitch] = new WemoSwitch(i + 1, 8080 + i);
+//           wemoDevice[numOfWemoSwitch]->RegisterHandlers();
+//           numOfWemoSwitch++;
+//         }
+//         break;
+//     }
+//   }
+//   return result;
 }
 
 #endif // USE_WEBSERVER && USE_EMULATION && USE_EMULATION_WEMO
