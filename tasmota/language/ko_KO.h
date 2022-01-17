@@ -302,7 +302,7 @@
 #define D_SELECT_YOUR_WIFI_NETWORK "아래에서 WiFi를 선택하세요"
 #define D_SHOW_MORE_WIFI_NETWORKS "다른 WiFi 탐색"
 #define D_SHOW_MORE_OPTIONS "더보기"
-#define D_CHECK_CREDENTIALS "Please, check your credentials"
+#define D_CHECK_CREDENTIALS "올바른 WiFi 네트워크인지 확인해주세요"
 #define D_SUCCESSFUL_WIFI_CONNECTION "Successful WiFi Connection"
 #define D_NOW_YOU_CAN_CLOSE_THIS_WINDOW "Now you can close this window"
 #define D_REDIRECTING_TO_NEW_IP "새로운 네트워크로 이동 중입니다. 잠시만 기다려주세요"
@@ -392,6 +392,8 @@
 #define D_ENTER_COMMAND "커맨드 입력"
 #define D_ENABLE_WEBLOG_FOR_RESPONSE "응답이 있다면 Weblog 2를 사용"
 #define D_NEED_USER_AND_PASSWORD "user=<아이디>&password=<비밀번호> 필요"
+
+#define D_CHECK_CERTIFICATION "인증서 정보가 없습니다. 직방 앱을 사용해 기기를 등록해주세요."
 
 // xdrv_01_mqtt.ino
 #define D_FINGERPRINT "TLS 지문 확인..."

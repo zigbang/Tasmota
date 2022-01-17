@@ -12,8 +12,7 @@ void StartWebserverSecure(void)
       WebserverSecure->getServer().setBufferSizes(1024, 1024);
       WebserverSecure->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
       WebserverSecure->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
-      WebserverSecure->on(F("/info"), HTTP_GET, HandleDeviceInfo);
-      WebserverSecure->on(F("/wifi"), HTTP_POST, HandleWifiConfigurationWithApp);
+      WebserverSecure->on(F("/config"), HTTP_POST, HandleConfigurationWithApp);
     }
 
     WebserverSecure->begin(); // Web server start
@@ -311,12 +310,6 @@ void HandleCognitoLoginCode(void)
   //WebserverSecure->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/oauth2/token")), true);
 }
 
-void HandleDeviceInfo(void) {
-  WSContentBeginSecure(200, CT_APP_JSON);
-  WSContentSend_PSecure(PSTR("{\"message\":\"Success\", \"data\":{\"nickname\":\"%s\", \"mac\":\"%s\", \"type\":\"%s\"}}"), SettingsText(SET_FRIENDLYNAME1), WiFi.macAddress().c_str(), DEVICE_TYPE);
-  WSContentEndSecure();
-}
-
 void HandleCertsConfiguration(void) {
   if(!WebserverSecure->hasArg(F("plain"))) {
     WSContentBeginSecure(500, CT_APP_JSON);
@@ -351,7 +344,7 @@ void HandleCertsConfiguration(void) {
   WSContentEndSecure();
 }
 
-void HandleWifiConfigurationWithApp(void) {
+void HandleConfigurationWithApp(void) {
   if(!WebserverSecure->hasArg(F("plain"))) {
     WSContentBeginSecure(500, CT_APP_JSON);
     WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
@@ -362,21 +355,24 @@ void HandleWifiConfigurationWithApp(void) {
   JsonParser parser((char*) WebserverSecure->arg("plain").c_str());
   JsonParserObject stateObject = parser.getRootObject();
 
+  String idToken = stateObject["idToken"].getStr();
   String ssid = stateObject["ssid1"].getStr();
   String pwd = stateObject["pwd1"].getStr();
-  if (ssid.length() || pwd.length()) {
+
+  if (!idToken.length() || !ssid.length() || !pwd.length()) {
+    WSContentBeginSecure(400, CT_APP_JSON);
+    WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"2\" \"data\":\"Check token, ssid, and pwd\"}"));
+    WSContentEndSecure();
+    return;
+  } else {
+    SettingsUpdateText(SET_ID_TOKEN, (char*)idToken.c_str());
     SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
     SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
-  }
-
-  ssid = stateObject["ssid2"].getStr();
-  pwd = stateObject["pwd2"].getStr();
-  if (ssid.length() || pwd.length()) {
-    SettingsUpdateText(SET_STASSID2, (char*)ssid.c_str());
-    SettingsUpdateText(SET_STAPWD2, (char*)pwd.c_str());
   }
 
   WSContentBeginSecure(200, CT_APP_JSON);
   WSContentSend_PSecure(PSTR("{\"message\":\"Success\"}"));
   WSContentEndSecure();
+
+  TasmotaGlobal.restart_flag = 2;
 }
