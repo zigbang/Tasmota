@@ -208,7 +208,6 @@ void MqttInit(void) {
   if (host.indexOf(F(".iot.")) && host.endsWith(F(".amazonaws.com"))) {  // look for ".iot." and ".amazonaws.com" in the domain name
     Settings->flag4.mqtt_no_retain = true;
   }
-
   if (Mqtt.mqtt_tls) {
     if (!tlsClient) {
 #ifdef ESP32
@@ -224,6 +223,9 @@ void MqttInit(void) {
       tlsClient->setClientECCert(AWS_IoT_Client_Certificate,
                                 AWS_IoT_Private_Key,
                                 0xFFFF /* all usages, don't care */, 0);
+      TasmotaGlobal.cert_info_flag = 1;
+    } else {
+      TasmotaGlobal.cert_info_flag = 0;
     }
 #endif
 
@@ -1595,7 +1597,10 @@ const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate 
 void ConvertTlsFile(uint8_t cert) {
   tls_dir_t *tls_dir_write;
 
+  int freeheap = ESP.getFreeHeap();
+  printf("free heap size: %d\n", freeheap);
   uint8_t *spi_buffer = (uint8_t*) malloc(tls_spi_len);
+  printf("spi_buffer\n");
   if (!spi_buffer) {
     AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
     return;
@@ -1607,10 +1612,13 @@ void ConvertTlsFile(uint8_t cert) {
   }
 
   char* tls_file = cert ? (char*)AmazonClientCert : (char*)AmazonPrivateKey;
+  printf("tls_file: %s\n", tls_file);
 
   RemoveSpace(tls_file);
 
+  printf("bin_buf\n");
   uint32_t bin_len = decode_base64_length((unsigned char*)tls_file);
+  printf("bin_len: %d\n", bin_len);
   uint8_t  *bin_buf = nullptr;
   if (bin_len > 0) {
     bin_buf = (uint8_t*) malloc(bin_len + 4);
@@ -1630,6 +1638,7 @@ void ConvertTlsFile(uint8_t cert) {
 
   bool save_file = false;   // for ESP32, do we need to write file
 
+  printf("buffer ready\n");
   if (!cert) {
     TlsEraseBuffer(spi_buffer);   // Erase any previously stored data
 
