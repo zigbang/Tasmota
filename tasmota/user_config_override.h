@@ -38,7 +38,7 @@
 #define CFG_HOLDER        4617
 
 #undef  MQTT_HOST
-#define MQTT_HOST         "a3krw5nopfpfqu-ats.iot.ap-northeast-2.amazonaws.com" // [MqttHost]
+#define MQTT_HOST         "a3b608yz74ta5k-ats.iot.ap-northeast-2.amazonaws.com" // [MqttHost]
 
 #undef  MQTT_PORT
 #define MQTT_PORT         8883                   // [MqttPort] MQTT port (10123 on CloudMQTT)

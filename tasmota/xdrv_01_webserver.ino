@@ -355,7 +355,11 @@ const char kUploadErrors[] PROGMEM =
 
 const uint16_t DNS_PORT = 53;
 enum HttpOptions {HTTP_OFF, HTTP_USER, HTTP_ADMIN, HTTP_MANAGER, HTTP_MANAGER_RESET_ONLY};
-enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED_SUCCESSFUL, WIFI_TEST_FINISHED_BAD};
+enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED_SUCCESSFUL, WIFI_TEST_FINISHED_BAD, WIFI_TEST_FINISHED_BAD_NEED_CERT};
+
+char ssid[30];
+char pwd[30];
+char deviceName[10];
 
 DNSServer *DnsServer;
 ESP8266WebServer *Webserver;
@@ -485,12 +489,12 @@ void WebServer_on(const char * prefix, void (*func)(void), uint8_t method = HTTP
 
 void StartWebserver(int type, IPAddress ipweb)
 {
+  if (type != HTTP_MANAGER && type != HTTP_MANAGER_RESET_ONLY) { return; } // 웹서버는 AP 모드에서만 사용
   Settings->web_refresh = HTTP_REFRESH_TIME;
   if (!Web.state) {
     if (!Webserver) {
-      Webserver = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
-      // call `Webserver->on()` on each entry
-      for (uint32_t i=0; i<nitems(WebServerDispatch); i++) {
+      Webserver = new ESP8266WebServer(80);
+      for (uint32_t i=0; i<nitems(WebServerDispatch); i++) { // TODO: 웹서버 API 정리
         const WebServerDispatch_t & line = WebServerDispatch[i];
         // copy uri in RAM and prefix with '/'
         char uri[4];
@@ -570,6 +574,7 @@ void WifiManagerBegin(bool reset_only)
   DnsServer->start(DNS_PORT, "*", WiFi.softAPIP());
 
   StartWebserver((reset_only ? HTTP_MANAGER_RESET_ONLY : HTTP_MANAGER), WiFi.softAPIP());
+  StartWebserverSecure();
 }
 
 void PollDnsWebserver(void)
@@ -1082,8 +1087,6 @@ String HtmlEscape(const String unescaped) {
 }
 
 void HandleWifiConfiguration(void) {
-  char tmp[TOPSZ];  // Max length is currently 150
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_WIFI));
 
   if (Webserver->hasArg(F("save")) && HTTP_MANAGER_RESET_ONLY != Web.state) {
@@ -1105,18 +1108,14 @@ void HandleWifiConfiguration(void) {
       TasmotaGlobal.ota_state_flag = 0;                  // No OTA
 //      TasmotaGlobal.blinks = 0;                          // Disable blinks initiated by WifiManager
 
-      WebGetArg(PSTR("s1"), tmp, sizeof(tmp));   // SSID1
-      SettingsUpdateText(SET_STASSID1, tmp);
-      WebGetArg(PSTR("p1"), tmp, sizeof(tmp));   // PASSWORD1
-      SettingsUpdateText(SET_STAPWD1, tmp);
-      WebGetArg(PSTR("d"), tmp, sizeof(tmp));   // DeviceName
-      SettingsUpdateText(SET_DEVICENAME, tmp);
-      SettingsUpdateText(SET_FRIENDLYNAME1, tmp);
+      WebGetArg(PSTR("s1"), ssid, sizeof(ssid));   // SSID1
+      WebGetArg(PSTR("p1"), pwd, sizeof(pwd));   // PASSWORD1
+      WebGetArg(PSTR("d"), deviceName, sizeof(deviceName));   // DeviceName
 
       AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_CONNECTING_TO_AP " %s " D_AS " %s ..."),
-        SettingsText(SET_STASSID1), TasmotaGlobal.hostname);
+        ssid, TasmotaGlobal.hostname);
 
-      WiFi.begin(SettingsText(SET_STASSID1), SettingsText(SET_STAPWD1));
+      WiFi.begin(ssid, pwd);
 
       WebRestart(2);
     } else {
@@ -1131,7 +1130,15 @@ void HandleWifiConfiguration(void) {
   if ( WIFI_TEST_FINISHED_SUCCESSFUL == Web.wifiTest ) {
     Web.wifiTest = WIFI_NOT_TESTING;
 #if (RESTART_AFTER_INITIAL_WIFI_CONFIG)
-    WebRestart(3);
+    if (TasmotaGlobal.cert_info_flag) {
+      SettingsUpdateText(SET_STASSID1, ssid);
+      SettingsUpdateText(SET_STAPWD1, pwd);
+      SettingsUpdateText(SET_DEVICENAME, deviceName);
+      SettingsUpdateText(SET_FRIENDLYNAME1, deviceName);
+      WebRestart(3);
+    } else {
+      Web.wifiTest = WIFI_TEST_FINISHED_BAD_NEED_CERT;
+    }
 #else
     HandleRoot();
 #endif
@@ -1300,9 +1307,11 @@ void HandleWifiConfiguration(void) {
     WSContentSend_P(PSTR("<h3>"));
 
     if (WIFI_TESTING == Web.wifiTest) {
-      WSContentSend_P(PSTR(D_TRYING_TO_CONNECT "<br>%s</h3></div>"), SettingsText(SET_STASSID1));
+      WSContentSend_P(PSTR(D_TRYING_TO_CONNECT "<br>%s</h3></div>"), ssid);
     } else if (WIFI_TEST_FINISHED_BAD == Web.wifiTest) {
-      WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CREDENTIALS "</h3></div>"), SettingsText(SET_STASSID1));
+      WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CREDENTIALS "</h3></div>"), ssid);
+    } else if (WIFI_TEST_FINISHED_BAD_NEED_CERT == Web.wifiTest) {
+      WSContentSend_P(PSTR(D_CONNECT_FAILED_TO " %s<br>" D_CHECK_CERTIFICATION "</div>"), ssid);
     }
     WSContentSend_P(PSTR("<button style=\"display:block\" onclick=\"document.getElementById('s1').value='%s';document.getElementById('p1').value='%s';\">Test용 WiFi</button><p></p>"), DEFAULT_SSID, DEFAULT_PASS);
     // More Options Button
