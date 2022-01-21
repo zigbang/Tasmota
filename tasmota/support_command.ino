@@ -39,6 +39,7 @@ const char kTasmotaCommands[] PROGMEM = "|"  // No prefix
 #endif  // USE_DEVICE_GROUPS_SEND
   D_CMND_DEVGROUP_SHARE "|" D_CMND_DEVGROUPSTATUS "|" D_CMND_DEVGROUP_TIE "|"
 #endif  // USE_DEVICE_GROUPS
+  D_CMND_FACTORY_RESET "|" D_CMND_SSID_RESET "|" D_CMND_UPDATE_CERT "|" D_CMND_READ_INPUT "|"
   D_CMND_SENSOR "|" D_CMND_DRIVER
 #ifdef ESP32
    "|Info|" D_CMND_TOUCH_CAL "|" D_CMND_TOUCH_THRES "|" D_CMND_TOUCH_NUM "|" D_CMND_CPU_FREQUENCY
@@ -67,6 +68,7 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
 #endif  // USE_DEVICE_GROUPS_SEND
   &CmndDevGroupShare, &CmndDevGroupStatus, &CmndDevGroupTie,
 #endif  // USE_DEVICE_GROUPS
+  &CmndFactoryReset, &CmndSSIDReset, &CmndUpdateCert, &CmndReadInput,
   &CmndSensor, &CmndDriver
 #ifdef ESP32
   , &CmndInfo, &CmndTouchCal, &CmndTouchThres, &CmndTouchNum, &CmndCpuFrequency
@@ -2262,6 +2264,62 @@ void CmndDevGroupTie(void)
   }
 }
 #endif  // USE_DEVICE_GROUPS
+
+void CmndFactoryReset(void)
+{
+  TasmotaGlobal.restart_flag = 212;
+  Response_P(PSTR("{\"Factory reset\":\"Success\"}"));
+}
+
+void CmndSSIDReset(void)
+{
+  SettingsUpdateText(SET_STASSID1, "");
+  SettingsUpdateText(SET_STAPWD1, "");
+  SettingsUpdateText(SET_STASSID2, "");
+  SettingsUpdateText(SET_STAPWD2, "");
+  TasmotaGlobal.restart_flag = 2;
+  Response_P(PSTR("{\"SSID reset\":\"Success\"}"));
+}
+
+void CmndUpdateCert(void)
+{
+  if (XdrvMailbox.data_len > 0) {
+    JsonParser parser((char*) XdrvMailbox.data);
+    JsonParserObject stateObject = parser.getRootObject();
+
+    String cert = stateObject["cert"].getStr();
+    String key = stateObject["key"].getStr();
+
+    if (!cert.length() || !key.length()) {
+      Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+      return;
+    }
+
+    TasmotaGlobal.cert_info_flag = 0;
+    char* certCharType = (char*)cert.c_str();
+    char* keyCharType = (char*)key.c_str();
+    
+    memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+    memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+    printf("cert: %s\n", certCharType);
+    printf("key: %s\n", keyCharType);
+
+    cert.~String();
+    key.~String();
+
+    ConvertTlsFile(0);
+    ConvertTlsFile(1);
+    TasmotaGlobal.cert_info_flag = 1;
+    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
+  } else {
+    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+  }
+}
+
+void CmndReadInput(void)
+{
+  // TODO: Read GPIO value
+}
 
 void CmndSensor(void)
 {
