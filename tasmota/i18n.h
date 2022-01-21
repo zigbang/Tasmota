@@ -354,6 +354,10 @@
 #define D_CMND_HUMOFFSET "HumOffset"
 #define D_CMND_GLOBAL_TEMP "GlobalTemp"
 #define D_CMND_GLOBAL_HUM "GlobalHum"
+#define D_CMND_FACTORY_RESET "FactoryReset"
+#define D_CMND_SSID_RESET "SSIDReset"
+#define D_CMND_UPDATE_CERT "UpdateCert"
+#define D_CMND_READ_INPUT "ReadInput"
 
 #ifdef ESP32
 #define D_CMND_TOUCH_CAL "TouchCal"
