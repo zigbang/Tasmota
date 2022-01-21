@@ -1,3 +1,5 @@
+#include "FS.h"
+
 struct WEBSECURE {
   bool state_HTTPS = false;
   bool state_login = false;
@@ -9,9 +11,8 @@ void StartWebserverSecure(void)
     if (!WebserverSecure) {
       WebserverSecure = new ESP8266WebServerSecure(443);
       WebserverSecure->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
-      WebserverSecure->getServer().setBufferSizes(1024, 1024);
-      WebserverSecure->on(F("/lc"), HTTP_GET, HandleCognitoLoginCode);
-      WebserverSecure->on(F("/certs"), HTTP_POST, HandleCertsConfiguration);
+      // WebserverSecure->getServer().setBufferSizes(1024, 1024);
+      WebserverSecure->getServer().setBufferSizes(2048, 1024);
       WebserverSecure->on(F("/config"), HTTP_POST, HandleConfigurationWithApp);
     }
 
@@ -292,59 +293,8 @@ void WSContentStopSecure(void)
 
 /*********************************************************************************************/
 
-void HandleCognitoLoginCode(void)
-{
-  unsigned char authorization_output[TOPSZ] = "";
-  unsigned char* authorization_input = (unsigned char*)"3ambmcokjea85jv4ff2hmkb0un:disli84aaq2ggcul27u5334e5pp74v9gu2mp0h4t4pj1ac1c7g9";
-  WebSecure.state_login = true;
-  Serial.print("========================= Cognito code is ");
-  Serial.println(WebserverSecure->arg("code"));
-  WebserverSecure->sendHeader(F("Location"), String(F("http://")) + WebserverSecure->client().localIP().toString(), true);
-  WebserverSecure->send(302, "text/plain", "");
-
-  //encode_base64(authorization_input,strlen(String((char*)authorization_input).c_str()),authorization_output);
-  
-  //WebserverSecure->sendHeader(F("Authorization", String(F("Basic ")) + String((char*)authorization_output).c_str()), true);
-  //WebserverSecure->sendHeader(F("Content-Type", String(F("application/x-www-form-urlencoded")), true);
-
-  //WebserverSecure->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/oauth2/token")), true);
-}
-
-void HandleCertsConfiguration(void) {
-  if(!WebserverSecure->hasArg(F("plain"))) {
-    WSContentBeginSecure(500, CT_APP_JSON);
-    WSContentSend_PSecure(PSTR("{\"message\":\"Fail\"}"));
-    WSContentEndSecure();
-    return;
-  }
-
-  JsonParser parser((char*) WebserverSecure->arg("plain").c_str());
-  JsonParserObject stateObject = parser.getRootObject();
-  String cert = stateObject["cert"].getStr();
-  String key = stateObject["key"].getStr();
-  char* certCharType = (char*)cert.c_str();
-  char* keyCharType = (char*)key.c_str();
-
-/* TODO: 인증서 사이즈 체크 예외코드 작성
-  if(cert.length() != 256 || key.length() < 10) {
-    WSContentBegin(500, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Fail\"}"));
-    WSContentEnd();
-    return;
-  }
-*/
-  memcpy(AmazonClientCert, certCharType, strlen(certCharType));
-  memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
-  MqttDisconnect();
-  ConvertTlsFile(0);
-  ConvertTlsFile(1);
-
-  WSContentBeginSecure(200, CT_APP_JSON);
-  WSContentSend_PSecure(PSTR("{\"message\":\"Success\"}"));
-  WSContentEndSecure();
-}
-
 void HandleConfigurationWithApp(void) {
+  bool save_result = false;
   if(!WebserverSecure->hasArg(F("plain"))) {
     WSContentBeginSecure(500, CT_APP_JSON);
     WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
@@ -359,13 +309,18 @@ void HandleConfigurationWithApp(void) {
   String ssid = stateObject["ssid1"].getStr();
   String pwd = stateObject["pwd1"].getStr();
 
-  if (!idToken.length() || !ssid.length() || !pwd.length()) {
+  if (idToken.length()) {
+    char* temp = (char*)idToken.c_str();
+    save_result = TfsSaveFile("/idToken.txt", (uint8_t*)temp, 1024);
+  }
+
+  if (!save_result || !ssid.length() || !pwd.length()) {
     WSContentBeginSecure(400, CT_APP_JSON);
     WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"2\" \"data\":\"Check token, ssid, and pwd\"}"));
     WSContentEndSecure();
     return;
   } else {
-    SettingsUpdateText(SET_ID_TOKEN, (char*)idToken.c_str());
+    SettingsUpdateText(SET_ID_TOKEN, "TRUE");
     SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
     SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
   }

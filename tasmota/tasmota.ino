@@ -305,7 +305,10 @@ void setup(void) {
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
   sprintf(tmp, "ZiotThing_%s_%s_group", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
-  if (strlen(SettingsText(SET_ID_TOKEN))) { TasmotaGlobal.idToken_info_flag = true; }
+  if (strlen(SettingsText(SET_ID_TOKEN))) {
+    TasmotaGlobal.idToken_info_flag = true;
+  }
+  printf("MQTT_TOPIC: %s\n", SettingsText(SET_MQTT_TOPIC));
 
   SettingsDelta();
 
