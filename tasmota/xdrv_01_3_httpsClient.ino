@@ -14,22 +14,22 @@ void HTTPSClientInit(void) {
 
 void GetCertification(void) {
     const char host[] = "p2x2wtwvsf.execute-api.ap-northeast-2.amazonaws.com";
-    String url = "/dev/certification?idToken=" + String(SettingsText(SET_ID_TOKEN)) + "&deviceType=light" + "&macAddr=" + NetworkUniqueId();
+    String url = "/dev/certification?deviceType=DEV-TASMOTA-LIGHT&macAddr=" + NetworkUniqueId();
 
-    if (!client.connect(host, 443)) {
-        AddLog(LOG_LEVEL_INFO, PSTR("%s에 HTTPS 연결 실패"), host);
+    char* idToken = (char*)malloc(1024);
+
+    bool load_result = TfsLoadFile("/idToken.txt", (uint8_t*)idToken, 1024);
+
+    if (!load_result || !client.connect(host, 443)) {
+        AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
     } else {
-        AddLog(LOG_LEVEL_INFO, PSTR("%s에 HTTPS 연결 성공"), host);
-
-        printf("url : %s\n", url.c_str());
-        
+        AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 성공"), host);
 
         client.print(String("GET ") + url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
-                    "User-Agent: ZIoTTasmota\r\n" +
+                    "User-Agent: Zigbang\r\n" +
+                    "Authorization: " + idToken +"\r\n" +
                     "Connection: close\r\n\r\n");
-        
-        printf("Reqeust sent\n");
 
         String headers = "";
         String body = "";
@@ -37,10 +37,12 @@ void GetCertification(void) {
         bool currentLineIsBlank = true;
         bool gotResponse = false;
 
+        free(idToken);
+
         unsigned long timeout = millis();
         while (!client.available()) {
             if (millis() - timeout > 20000) {
-                printf("Client Timeout !");
+                printf("시간초과!\n");
                 client.stop();
                 provisioning_counter = 0;
                 return;
@@ -71,8 +73,7 @@ void GetCertification(void) {
         }
         if (gotResponse) {
             if (headers.startsWith("HTTP/1.1 200")) {
-                AddLog(LOG_LEVEL_INFO, PSTR("request 성공"));
-                printf("body: %s\n", body.c_str());
+                AddLog(LOG_LEVEL_INFO, PSTR("요청 성공"));
                 JsonParser parser((char*) body.c_str());
                 JsonParserObject stateObject = parser.getRootObject();
 
@@ -80,21 +81,17 @@ void GetCertification(void) {
                 String key = stateObject["key"].getStr();
 
                 if (!cert.length() || !key.length()) {
-                    AddLog(LOG_LEVEL_INFO, PSTR("Cert 및 Key 정보 Error"));
+                    AddLog(LOG_LEVEL_INFO, PSTR("Cert 정보 Error"));
                     client.stop();
                     provisioning_counter = 0;
                     return;
                 }
 
-                SettingsUpdateText(SET_ID_TOKEN, "");
-                TasmotaGlobal.idToken_info_flag = 0;
                 char* certCharType = (char*)cert.c_str();
                 char* keyCharType = (char*)key.c_str();
 
                 memcpy(AmazonClientCert, certCharType, strlen(certCharType));
                 memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
-                printf("cert: %s\n", certCharType);
-                printf("key: %s\n", keyCharType);
 
                 url.~String();
                 headers.~String();
@@ -102,12 +99,20 @@ void GetCertification(void) {
                 cert.~String();
                 key.~String();
 
-                ConvertTlsFile(0);
-                ConvertTlsFile(1);
+                if (!ConvertTlsFile(0) || !ConvertTlsFile(1)) {
+                    AddLog(LOG_LEVEL_INFO, PSTR("Cert 저장 실패"));
+                    client.stop();
+                    provisioning_counter = 0;
+                    return;
+                }
+
+                SettingsUpdateText(SET_ID_TOKEN, "");
+                TasmotaGlobal.idToken_info_flag = 0;
                 TasmotaGlobal.cert_info_flag = 1;
                 TasmotaGlobal.restart_flag = 2;
+                AddLog(LOG_LEVEL_INFO, PSTR("Cert 저장 성공"));
             } else {
-                AddLog(LOG_LEVEL_INFO, PSTR("request 실패"));
+                AddLog(LOG_LEVEL_INFO, PSTR("요청 실패"));
             }
 
             client.stop();
@@ -119,14 +124,12 @@ void GetCertification(void) {
 
 void ProvisioningCheck(void) {
     if (!TasmotaGlobal.idToken_info_flag && TasmotaGlobal.cert_info_flag) {
-        provisioning_counter = 0;
         return;
     } else {
-        if (provisioning_counter) {
-            provisioning_counter--;
-        } else {
-            provisioning_counter = 1000;
-            GetCertification();
+        provisioning_counter++;
+        if (provisioning_counter == 5) {
+            TasmotaGlobal.restart_flag = 2;
         }
+        GetCertification();
     }
 }

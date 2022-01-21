@@ -506,7 +506,6 @@ void StartWebserver(int type, IPAddress ipweb)
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
-      Webserver->on(F("/li"), HTTP_GET, HandleCognitoLogin);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -900,28 +899,6 @@ void WebRestart(uint32_t type)
 }
 
 /*********************************************************************************************/
-
-void HandleCognitoLogin(void)
-{
-  Webserver->sendHeader(F("Location"), String(F("https://ziot-sonoff-auth.auth.ap-northeast-2.amazoncognito.com/login?client_id=3ambmcokjea85jv4ff2hmkb0un&response_type=code&scope=aws.cognito.signin.user.admin+openid&redirect_uri=https://192.168.219.105/lc")), true);
-  WSSend(302, CT_PLAIN, "");  // Empty content inhibits Content-length header so we have to close the socket ourselves.
-}
-
-void HandleWifiLogin(void)
-{
-  WSContentStart_P(PSTR(D_CONFIGURE_WIFI), false);  // false means show page no matter if the client has or has not credentials
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_LOGIN);
-
-  if (HTTP_MANAGER_RESET_ONLY == Web.state) {
-    WSContentSpaceButton(BUTTON_RESTART);
-#ifndef FIRMWARE_MINIMAL
-    WSContentSpaceButton(BUTTON_RESET_CONFIGURATION);
-#endif  // FIRMWARE_MINIMAL
-  }
-
-  WSContentStop();
-}
 
 uint32_t WebDeviceColumns(void) {
   const uint32_t max_columns = 8;

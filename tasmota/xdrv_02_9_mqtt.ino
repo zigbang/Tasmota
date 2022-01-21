@@ -1594,7 +1594,7 @@ void loadTlsDir(void) {
 
 const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate buffer.";
 
-void ConvertTlsFile(uint8_t cert) {
+bool ConvertTlsFile(uint8_t cert) {
   tls_dir_t *tls_dir_write;
 
   int freeheap = ESP.getFreeHeap();
@@ -1603,7 +1603,7 @@ void ConvertTlsFile(uint8_t cert) {
   printf("spi_buffer\n");
   if (!spi_buffer) {
     AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
-    return;
+    return false;
   }
   if (tls_spi_start != nullptr) {  // safeguard for ESP32
     memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
@@ -1625,7 +1625,7 @@ void ConvertTlsFile(uint8_t cert) {
     if (!bin_buf) {
       AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
       free(spi_buffer);
-      return;
+      return false;
     }
   }
 
@@ -1648,7 +1648,7 @@ void ConvertTlsFile(uint8_t cert) {
         AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate must be 32 bytes: %d."), bin_len);
         free(spi_buffer);
         free(bin_buf);
-        return;
+        return false;
       }
       tls_entry_t *entry = &tls_dir_write->entry[0];
       entry->name = TLS_NAME_SKEY;
@@ -1666,14 +1666,14 @@ void ConvertTlsFile(uint8_t cert) {
       AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: cannot store Cert if no Key previously stored."));
       free(spi_buffer);
       free(bin_buf);
-      return;
+      return false;
     }
     if (bin_len <= 256) {
       // Certificate lenght too short
       AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate length too short: %d."), bin_len);
       free(spi_buffer);
       free(bin_buf);
-      return;
+      return false;
     }
 
     tls_entry_t *entry = &tls_dir_write->entry[1];
@@ -1692,6 +1692,7 @@ void ConvertTlsFile(uint8_t cert) {
   free(bin_buf);
 
   loadTlsDir();   // reload into memory any potential change
+  return true;
 }
 
 void CmndTlsKey(void) {

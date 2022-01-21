@@ -167,14 +167,14 @@ const uint8_t OTA_ATTEMPTS = 5;             // Number of times to try fetching t
 
 const uint16_t FLOATSZ = 16;                // Max number of characters in float result from dtostrfd (max 32)
 const uint16_t CMDSZ = 24;                  // Max number of characters in command
-const uint16_t TOPSZ = 100;                 // Max number of characters in topic string
+const uint16_t TOPSZ = 60;                 // Max number of characters in topic string
 
 #ifdef ESP8266
 #ifdef PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
-const uint16_t LOG_BUFFER_SIZE = 4096;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
+const uint16_t LOG_BUFFER_SIZE = 2048;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 //const uint16_t LOG_BUFFER_SIZE = 6144;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 #else
-const uint16_t LOG_BUFFER_SIZE = 1024;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
+const uint16_t LOG_BUFFER_SIZE = 512;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 #endif  // PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
 #else   // Not ESP8266
 const uint16_t LOG_BUFFER_SIZE = 6144;      // Max number of characters in logbuffer used by weblog, syslog and mqttlog
