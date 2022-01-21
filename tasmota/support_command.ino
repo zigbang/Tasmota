@@ -39,6 +39,7 @@ const char kTasmotaCommands[] PROGMEM = "|"  // No prefix
 #endif  // USE_DEVICE_GROUPS_SEND
   D_CMND_DEVGROUP_SHARE "|" D_CMND_DEVGROUPSTATUS "|" D_CMND_DEVGROUP_TIE "|"
 #endif  // USE_DEVICE_GROUPS
+  D_CMND_FACTORY_RESET "|" D_CMND_SSID_RESET "|" D_CMND_UPDATE_CERT "|" D_CMND_READ_INPUT "|"
   D_CMND_SENSOR "|" D_CMND_DRIVER
 #ifdef ESP32
    "|Info|" D_CMND_TOUCH_CAL "|" D_CMND_TOUCH_THRES "|" D_CMND_TOUCH_NUM "|" D_CMND_CPU_FREQUENCY
@@ -67,6 +68,7 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
 #endif  // USE_DEVICE_GROUPS_SEND
   &CmndDevGroupShare, &CmndDevGroupStatus, &CmndDevGroupTie,
 #endif  // USE_DEVICE_GROUPS
+  &CmndFactoryReset, &CmndSSIDReset, &CmndUpdateCert, &CmndReadInput,
   &CmndSensor, &CmndDriver
 #ifdef ESP32
   , &CmndInfo, &CmndTouchCal, &CmndTouchThres, &CmndTouchNum, &CmndCpuFrequency
@@ -525,10 +527,10 @@ void CmndStatus(void)
   }
 
   if ((0 == payload) || (3 == payload)) {
-    Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS3_LOGGING "\":{\"" D_CMND_SERIALLOG "\":%d,\"" D_CMND_WEBLOG "\":%d,\"" D_CMND_MQTTLOG "\":%d,\"" D_CMND_SYSLOG "\":%d,\""
+    Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS3_LOGGING "\":{\"" D_CMND_SERIALLOG "\":%d,\"" D_CMND_MQTTLOG "\":%d,\"" D_CMND_SYSLOG "\":%d,\""
                           D_CMND_LOGHOST "\":\"%s\",\"" D_CMND_LOGPORT "\":%d,\"" D_CMND_SSID "\":[\"%s\",\"%s\"],\"" D_CMND_TELEPERIOD "\":%d,\""
                           D_JSON_RESOLUTION "\":\"%08X\",\"" D_CMND_SETOPTION "\":[\"%08X\",\"%s\",\"%08X\",\"%08X\",\"%08X\"]}}"),
-                          Settings->seriallog_level, Settings->weblog_level, Settings->mqttlog_level, Settings->syslog_level,
+                          Settings->seriallog_level, Settings->mqttlog_level, Settings->syslog_level,
                           SettingsText(SET_SYSLOG_HOST), Settings->syslog_port, EscapeJSONString(SettingsText(SET_STASSID1)).c_str(), EscapeJSONString(SettingsText(SET_STASSID2)).c_str(), Settings->tele_period,
                           Settings->flag2.data, Settings->flag.data, ToHex_P((unsigned char*)Settings->param, PARAM8_SIZE, stemp2, sizeof(stemp2)),
                           Settings->flag3.data, Settings->flag4.data, Settings->flag5.data);
@@ -2262,6 +2264,62 @@ void CmndDevGroupTie(void)
   }
 }
 #endif  // USE_DEVICE_GROUPS
+
+void CmndFactoryReset(void)
+{
+  TasmotaGlobal.restart_flag = 212;
+  Response_P(PSTR("{\"Factory reset\":\"Success\"}"));
+}
+
+void CmndSSIDReset(void)
+{
+  SettingsUpdateText(SET_STASSID1, "");
+  SettingsUpdateText(SET_STAPWD1, "");
+  SettingsUpdateText(SET_STASSID2, "");
+  SettingsUpdateText(SET_STAPWD2, "");
+  TasmotaGlobal.restart_flag = 2;
+  Response_P(PSTR("{\"SSID reset\":\"Success\"}"));
+}
+
+void CmndUpdateCert(void)
+{
+  if (XdrvMailbox.data_len > 0) {
+    JsonParser parser((char*) XdrvMailbox.data);
+    JsonParserObject stateObject = parser.getRootObject();
+
+    String cert = stateObject["cert"].getStr();
+    String key = stateObject["key"].getStr();
+
+    if (!cert.length() || !key.length()) {
+      Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+      return;
+    }
+
+    TasmotaGlobal.cert_info_flag = 0;
+    char* certCharType = (char*)cert.c_str();
+    char* keyCharType = (char*)key.c_str();
+    
+    memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+    memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+    printf("cert: %s\n", certCharType);
+    printf("key: %s\n", keyCharType);
+
+    cert.~String();
+    key.~String();
+
+    ConvertTlsFile(0);
+    ConvertTlsFile(1);
+    TasmotaGlobal.cert_info_flag = 1;
+    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
+  } else {
+    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+  }
+}
+
+void CmndReadInput(void)
+{
+  // TODO: Read GPIO value
+}
 
 void CmndSensor(void)
 {

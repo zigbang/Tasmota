@@ -1087,7 +1087,7 @@ void Every250mSeconds(void)
 
   switch (TasmotaGlobal.state_250mS) {
   case 0:                                                 // Every x.0 second
-    if (TasmotaGlobal.ota_state_flag && CommandsReady()) {
+    if (TasmotaGlobal.ota_state_flag && CommandsReady()) { // TODO: Flash에 저장된 OTA 설정 값을 읽는 것으로 변경, OTA 모드, 프로비저닝 모드에서 동작하지 않도록 체크 로직 필요
       TasmotaGlobal.ota_state_flag--;
       if (2 == TasmotaGlobal.ota_state_flag) {
         RtcSettings.ota_loader = 0;                       // Try requested image first
@@ -1312,22 +1312,9 @@ void Every250mSeconds(void)
       StartMdns();
 
 #ifdef USE_WEBSERVER
-      if (Settings->webserver) {
-
-#ifdef ESP8266
-        if (!WifiIsInManagerMode()) { StartWebserver(Settings->webserver, WiFi.localIP()); }
-#endif  // ESP8266
-#ifdef ESP32
-#ifdef USE_ETHERNET
-        StartWebserver(Settings->webserver, (EthernetLocalIP()) ? EthernetLocalIP() : WiFi.localIP());
-#else
-        StartWebserver(Settings->webserver, WiFi.localIP());
-#endif
-#endif  // ESP32
-
-        MdnsAddServiceHttp();
-      } else {
+      if (!Settings->webserver) {
         StopWebserver();
+        StopWebserverSecure();
       }
 #ifdef USE_EMULATION
       if (Settings->flag2.emulation) { UdpConnect(); }
@@ -1345,7 +1332,12 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
-      MqttCheck();
+      if (TasmotaGlobal.idToken_info_flag) {
+        // 프로비저닝 모드
+        ProvisioningCheck();
+      } else {
+        MqttCheck();
+      }
     } else {
 #ifdef USE_EMULATION
       UdpDisconnect();
@@ -1378,9 +1370,6 @@ void ArduinoOTAInit(void)
 {
   ArduinoOTA.setPort(8266);
   ArduinoOTA.setHostname(NetworkHostname());
-  if (strlen(SettingsText(SET_WEBPWD))) {
-    ArduinoOTA.setPassword(SettingsText(SET_WEBPWD));
-  }
 
   ArduinoOTA.onStart([]()
   {

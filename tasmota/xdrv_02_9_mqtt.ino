@@ -208,7 +208,6 @@ void MqttInit(void) {
   if (host.indexOf(F(".iot.")) && host.endsWith(F(".amazonaws.com"))) {  // look for ".iot." and ".amazonaws.com" in the domain name
     Settings->flag4.mqtt_no_retain = true;
   }
-
   if (Mqtt.mqtt_tls) {
     if (!tlsClient) {
 #ifdef ESP32
@@ -224,6 +223,9 @@ void MqttInit(void) {
       tlsClient->setClientECCert(AWS_IoT_Client_Certificate,
                                 AWS_IoT_Private_Key,
                                 0xFFFF /* all usages, don't care */, 0);
+      TasmotaGlobal.cert_info_flag = 1;
+    } else {
+      TasmotaGlobal.cert_info_flag = 0;
     }
 #endif
 
@@ -1592,13 +1594,16 @@ void loadTlsDir(void) {
 
 const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate buffer.";
 
-void ConvertTlsFile(uint8_t cert) {
+bool ConvertTlsFile(uint8_t cert) {
   tls_dir_t *tls_dir_write;
 
+  int freeheap = ESP.getFreeHeap();
+  printf("free heap size: %d\n", freeheap);
   uint8_t *spi_buffer = (uint8_t*) malloc(tls_spi_len);
+  printf("spi_buffer\n");
   if (!spi_buffer) {
     AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
-    return;
+    return false;
   }
   if (tls_spi_start != nullptr) {  // safeguard for ESP32
     memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
@@ -1607,17 +1612,20 @@ void ConvertTlsFile(uint8_t cert) {
   }
 
   char* tls_file = cert ? (char*)AmazonClientCert : (char*)AmazonPrivateKey;
+  printf("tls_file: %s\n", tls_file);
 
   RemoveSpace(tls_file);
 
+  printf("bin_buf\n");
   uint32_t bin_len = decode_base64_length((unsigned char*)tls_file);
+  printf("bin_len: %d\n", bin_len);
   uint8_t  *bin_buf = nullptr;
   if (bin_len > 0) {
     bin_buf = (uint8_t*) malloc(bin_len + 4);
     if (!bin_buf) {
       AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
       free(spi_buffer);
-      return;
+      return false;
     }
   }
 
@@ -1630,6 +1638,7 @@ void ConvertTlsFile(uint8_t cert) {
 
   bool save_file = false;   // for ESP32, do we need to write file
 
+  printf("buffer ready\n");
   if (!cert) {
     TlsEraseBuffer(spi_buffer);   // Erase any previously stored data
 
@@ -1639,7 +1648,7 @@ void ConvertTlsFile(uint8_t cert) {
         AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate must be 32 bytes: %d."), bin_len);
         free(spi_buffer);
         free(bin_buf);
-        return;
+        return false;
       }
       tls_entry_t *entry = &tls_dir_write->entry[0];
       entry->name = TLS_NAME_SKEY;
@@ -1657,14 +1666,14 @@ void ConvertTlsFile(uint8_t cert) {
       AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: cannot store Cert if no Key previously stored."));
       free(spi_buffer);
       free(bin_buf);
-      return;
+      return false;
     }
     if (bin_len <= 256) {
       // Certificate lenght too short
       AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate length too short: %d."), bin_len);
       free(spi_buffer);
       free(bin_buf);
-      return;
+      return false;
     }
 
     tls_entry_t *entry = &tls_dir_write->entry[1];
@@ -1683,6 +1692,7 @@ void ConvertTlsFile(uint8_t cert) {
   free(bin_buf);
 
   loadTlsDir();   // reload into memory any potential change
+  return true;
 }
 
 void CmndTlsKey(void) {
@@ -1852,8 +1862,6 @@ const char HTTP_FORM_MQTT2[] PROGMEM =
 
 void HandleMqttConfiguration(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
-
   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
 
   if (Webserver->hasArg(F("save"))) {

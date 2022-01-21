@@ -600,72 +600,72 @@ const char HTTP_EDITOR_FORM_END[] PROGMEM =
 
 #endif  // #ifdef GUI_EDIT_FILE
 
-void UfsDirectory(void) {
-  if (!HttpCheckPriviledgedAccess()) { return; }
+// void UfsDirectory(void) {
+//   if (!HttpCheckPriviledgedAccess()) { return; }
 
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_MANAGE_FILE_SYSTEM));
+//   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_MANAGE_FILE_SYSTEM));
 
-  uint8_t depth = 0;
+//   uint8_t depth = 0;
 
-  strcpy(ufs_path, "/");
+//   strcpy(ufs_path, "/");
 
-  if (Webserver->hasArg(F("download"))) {
-    String stmp = Webserver->arg(F("download"));
-    char *cp = (char*)stmp.c_str();
-    if (UfsDownloadFile(cp)) {
-      // is directory
-      strcpy(ufs_path, cp);
-    } else {
-      return;
-    }
-  }
+//   if (Webserver->hasArg(F("download"))) {
+//     String stmp = Webserver->arg(F("download"));
+//     char *cp = (char*)stmp.c_str();
+//     if (UfsDownloadFile(cp)) {
+//       // is directory
+//       strcpy(ufs_path, cp);
+//     } else {
+//       return;
+//     }
+//   }
 
-  if (Webserver->hasArg(F("dir"))) {
-    String stmp = Webserver->arg(F("dir"));
-    ufs_dir = atoi(stmp.c_str());
-    if (ufs_dir == 1) {
-      dfsp = ufsp;
-    } else {
-      if (ffsp) {
-        dfsp = ffsp;
-      }
-    }
-  }
+//   if (Webserver->hasArg(F("dir"))) {
+//     String stmp = Webserver->arg(F("dir"));
+//     ufs_dir = atoi(stmp.c_str());
+//     if (ufs_dir == 1) {
+//       dfsp = ufsp;
+//     } else {
+//       if (ffsp) {
+//         dfsp = ffsp;
+//       }
+//     }
+//   }
 
-  if (Webserver->hasArg(F("delete"))) {
-    String stmp = Webserver->arg(F("delete"));
-    char *cp = (char*)stmp.c_str();
-    dfsp->remove(cp);
-  }
+//   if (Webserver->hasArg(F("delete"))) {
+//     String stmp = Webserver->arg(F("delete"));
+//     char *cp = (char*)stmp.c_str();
+//     dfsp->remove(cp);
+//   }
 
-  WSContentStart_P(PSTR(D_MANAGE_FILE_SYSTEM));
-  WSContentSendStyle();
-  WSContentSend_P(UFS_FORM_FILE_UPLOAD);
+//   WSContentStart_P(PSTR(D_MANAGE_FILE_SYSTEM));
+//   WSContentSendStyle();
+//   WSContentSend_P(UFS_FORM_FILE_UPLOAD);
 
-  char ts[FLOATSZ];
-  dtostrfd((float)UfsInfo(0, ufs_dir == 2 ? 1:0) / 1000, 3, ts);
-  char fs[FLOATSZ];
-  dtostrfd((float)UfsInfo(1, ufs_dir == 2 ? 1:0) / 1000, 3, fs);
-  WSContentSend_PD(UFS_FORM_FILE_UPGc, WebColor(COL_TEXT), ts, fs);
+//   char ts[FLOATSZ];
+//   dtostrfd((float)UfsInfo(0, ufs_dir == 2 ? 1:0) / 1000, 3, ts);
+//   char fs[FLOATSZ];
+//   dtostrfd((float)UfsInfo(1, ufs_dir == 2 ? 1:0) / 1000, 3, fs);
+//   WSContentSend_PD(UFS_FORM_FILE_UPGc, WebColor(COL_TEXT), ts, fs);
 
-  if (ufs_dir) {
-    WSContentSend_P(UFS_FORM_FILE_UPGc1, (uint32_t)WiFi.localIP(), (ufs_dir == 1)?2:1, (ufs_dir == 1)?PSTR("SDCard"):PSTR("FlashFS"));
-  }
-  WSContentSend_P(UFS_FORM_FILE_UPGc2);
+//   if (ufs_dir) {
+//     WSContentSend_P(UFS_FORM_FILE_UPGc1, (uint32_t)WiFi.localIP(), (ufs_dir == 1)?2:1, (ufs_dir == 1)?PSTR("SDCard"):PSTR("FlashFS"));
+//   }
+//   WSContentSend_P(UFS_FORM_FILE_UPGc2);
 
-  WSContentSend_P(UFS_FORM_FILE_UPG, PSTR(D_SCRIPT_UPLOAD));
+//   WSContentSend_P(UFS_FORM_FILE_UPG, PSTR(D_SCRIPT_UPLOAD));
 
-  WSContentSend_P(UFS_FORM_SDC_DIRa);
-  if (ufs_type) {
-    UfsListDir(ufs_path, depth);
-  }
-  WSContentSend_P(UFS_FORM_SDC_DIRc);
-  WSContentSend_P(UFS_FORM_FILE_UPGb);
-  WSContentSpaceButton(BUTTON_MANAGEMENT);
-  WSContentStop();
+//   WSContentSend_P(UFS_FORM_SDC_DIRa);
+//   if (ufs_type) {
+//     UfsListDir(ufs_path, depth);
+//   }
+//   WSContentSend_P(UFS_FORM_SDC_DIRc);
+//   WSContentSend_P(UFS_FORM_FILE_UPGb);
+//   WSContentSpaceButton(BUTTON_MANAGEMENT);
+//   WSContentStop();
 
-  Web.upload_file_type = UPL_UFSFILE;
-}
+//   Web.upload_file_type = UPL_UFSFILE;
+// }
 
 void UfsListDir(char *path, uint8_t depth) {
   char name[32];
@@ -1044,29 +1044,29 @@ bool Xdrv50(uint8_t function) {
     case FUNC_COMMAND:
       result = DecodeCommand(kUFSCommands, kUFSCommand);
       break;
-#ifdef USE_WEBSERVER
-    case FUNC_WEB_ADD_MANAGEMENT_BUTTON:
-      if (ufs_type) {
-        if (XdrvMailbox.index) {
-          XdrvMailbox.index++;
-        } else {
-          WSContentSend_PD(UFS_WEB_DIR, PSTR(D_MANAGE_FILE_SYSTEM));
-        }
-      }
-      break;
-    case FUNC_WEB_ADD_HANDLER:
-//      Webserver->on(F("/ufsd"), UfsDirectory);
-//      Webserver->on(F("/ufsu"), HTTP_GET, UfsDirectory);
-//      Webserver->on(F("/ufsu"), HTTP_POST,[](){Webserver->sendHeader(F("Location"),F("/ufsu"));Webserver->send(303);}, HandleUploadLoop);
-      Webserver->on("/ufsd", UfsDirectory);
-      Webserver->on("/ufsu", HTTP_GET, UfsDirectory);
-      Webserver->on("/ufsu", HTTP_POST,[](){Webserver->sendHeader(F("Location"),F("/ufsu"));Webserver->send(303);}, HandleUploadLoop);
-#ifdef GUI_EDIT_FILE
-      Webserver->on("/ufse", HTTP_GET, UfsEditor);
-      Webserver->on("/ufse", HTTP_POST, UfsEditorUpload);
-#endif
-      break;
-#endif // USE_WEBSERVER
+// #ifdef USE_WEBSERVER
+//     case FUNC_WEB_ADD_MANAGEMENT_BUTTON:
+//       if (ufs_type) {
+//         if (XdrvMailbox.index) {
+//           XdrvMailbox.index++;
+//         } else {
+//           WSContentSend_PD(UFS_WEB_DIR, PSTR(D_MANAGE_FILE_SYSTEM));
+//         }
+//       }
+//       break;
+//     case FUNC_WEB_ADD_HANDLER:
+// //      Webserver->on(F("/ufsd"), UfsDirectory);
+// //      Webserver->on(F("/ufsu"), HTTP_GET, UfsDirectory);
+// //      Webserver->on(F("/ufsu"), HTTP_POST,[](){Webserver->sendHeader(F("Location"),F("/ufsu"));Webserver->send(303);}, HandleUploadLoop);
+//       Webserver->on("/ufsd", UfsDirectory);
+//       Webserver->on("/ufsu", HTTP_GET, UfsDirectory);
+//       Webserver->on("/ufsu", HTTP_POST,[](){Webserver->sendHeader(F("Location"),F("/ufsu"));Webserver->send(303);}, HandleUploadLoop);
+// #ifdef GUI_EDIT_FILE
+//       Webserver->on("/ufse", HTTP_GET, UfsEditor);
+//       Webserver->on("/ufse", HTTP_POST, UfsEditorUpload);
+// #endif
+//       break;
+// #endif // USE_WEBSERVER
   }
   return result;
 }

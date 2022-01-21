@@ -174,6 +174,8 @@ struct {
   uint8_t last_source;                      // Last command source
   uint8_t shutters_present;                 // Number of actual define shutters
   uint8_t discovery_counter;                // Delayed discovery counter
+  uint8_t idToken_info_flag;                // Zigbang id token from app
+  uint8_t cert_info_flag;                   // AWS IoT certification
 
 #ifndef SUPPORT_IF_STATEMENT
   uint8_t backlog_index;                    // Command backlog index
@@ -303,6 +305,10 @@ void setup(void) {
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
   sprintf(tmp, "ZiotThing_%s_%s_group", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
+  if (strlen(SettingsText(SET_ID_TOKEN))) {
+    TasmotaGlobal.idToken_info_flag = true;
+  }
+  printf("MQTT_TOPIC: %s\n", SettingsText(SET_MQTT_TOPIC));
 
   SettingsDelta();
 
@@ -393,6 +399,9 @@ void setup(void) {
     SettingsUpdateText(SET_HOSTNAME, TasmotaGlobal.hostname);
   }
 
+  mac_address.~String();
+  mac_part.~String();
+
   RtcInit();
   GpioInit();
   ButtonInit();
@@ -419,6 +428,8 @@ void setup(void) {
 #ifdef USE_ARDUINO_OTA
   ArduinoOTAInit();
 #endif  // USE_ARDUINO_OTA
+
+  HTTPSClientInit();
 
   XdrvCall(FUNC_INIT);
   XsnsCall(FUNC_INIT);
