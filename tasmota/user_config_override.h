@@ -56,6 +56,7 @@
 #ifndef USE_MQTT_AWS_IOT
 #define USE_MQTT_AWS_IOT
 #endif
+#define USE_UFILESYS
 
 #define PROJECT                "ZIoT_Sonoff"         // PROJECT is used as the default topic delimiter
 #define FRIENDLY_NAME          "ZIGBANG"         // [FriendlyName] Friendlyname up to 32 characters used by webpages and Alexa
