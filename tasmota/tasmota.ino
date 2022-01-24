@@ -308,7 +308,6 @@ void setup(void) {
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
   }
-  printf("MQTT_TOPIC: %s\n", SettingsText(SET_MQTT_TOPIC));
 
   SettingsDelta();
 
