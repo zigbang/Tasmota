@@ -1,5 +1,16 @@
 #include "FS.h"
+#ifdef ESP8266
 #include <WiFiClientSecure.h>
+#endif
+#ifdef ESP32
+#include <HTTPSServer.hpp>
+#include <SSLCert.hpp>
+#include <HTTPRequest.hpp>
+#include <HTTPResponse.hpp>
+using namespace httpsserver;
+SSLCert cert = SSLCert(
+    serverCert, serverCert_len, serverKey, serverKey_len);
+#endif
 
 extern const br_ec_private_key *AWS_IoT_Private_Key;
 
@@ -24,18 +35,31 @@ struct WEBSECURE {
   bool state_login = false;
 } WebSecure;
 
+#ifdef ESP32
+void HandleConfigurationWithApp(HTTPRequest * req, HTTPResponse * res);
+#endif
+
 void StartWebserverSecure(void)
 {
   if (!WebSecure.state_HTTPS) {
     if (!WebserverSecure) {
+#ifdef ESP8266
       WebserverSecure = new ESP8266WebServerSecure(443);
       WebserverSecure->getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
       // WebserverSecure->getServer().setBufferSizes(1024, 1024);
       WebserverSecure->getServer().setBufferSizes(2048, 1024);
       WebserverSecure->on(F("/config"), HTTP_POST, HandleConfigurationWithApp);
+#elif ESP32
+      WebserverSecure = new HTTPSServer(&cert);
+      ResourceNode *nodeHandleConfigurationWithApp = new ResourceNode("/config", "POST", &HandleConfigurationWithApp);
+      WebserverSecure->registerNode(nodeHandleConfigurationWithApp);
+#endif
     }
-
+#ifdef ESP8266
     WebserverSecure->begin(); // Web server start
+#elif ESP32
+    WebserverSecure->start();
+#endif
   }
   if (!WebSecure.state_HTTPS) {
     AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP "HTTPS" D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I"),
@@ -48,7 +72,11 @@ void StartWebserverSecure(void)
 void StopWebserverSecure(void)
 {
   if (WebSecure.state_HTTPS) {
+#ifdef ESP8266
     WebserverSecure->close();
+#elif ESP32
+    WebserverSecure->stop();
+#endif
     WebSecure.state_HTTPS = false;
     AddLog(LOG_LEVEL_INFO, PSTR("HTTPS 웹서버 종료"));
   }
@@ -56,6 +84,7 @@ void StopWebserverSecure(void)
 
 /*********************************************************************************************/
 
+#ifdef ESP8266
 void HttpHeaderCorsSecure(void)
 {
   if (strlen(SettingsText(SET_CORS))) {
@@ -309,11 +338,14 @@ void WSContentStopSecure(void)
   WSContentSend_PSecure(HTTP_END, WiFi.macAddress().c_str(), TasmotaGlobal.version);
   WSContentEndSecure();
 }
+#endif
 
 /*********************************************************************************************/
 
+#ifdef ESP8266
 void HandleConfigurationWithApp(void) {
   bool save_result = false;
+
   if(!WebserverSecure->hasArg(F("plain"))) {
     WSContentBeginSecure(500, CT_APP_JSON);
     WSContentSend_PSecure(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
@@ -349,12 +381,54 @@ void HandleConfigurationWithApp(void) {
 
   TasmotaGlobal.restart_flag = 2;
 }
+#elif ESP32
+void HandleConfigurationWithApp(HTTPRequest * req, HTTPResponse * res) {
+    bool save_result = false;
+    byte buffer[1024];
+
+    while (!req->requestComplete()) {
+      req->readBytes(buffer, 1024);
+    }
+
+    res->setHeader("Content-Type", "application/json");
+
+    JsonParser parser((char*)buffer);
+    JsonParserObject stateObject = parser.getRootObject();
+
+    if (stateObject.size() == 0) {
+      req->discardRequestBody();
+      res->printStd("{\"message\":\"Failed\", \"resason\":\"1\", \"data\":\"Server received empty request message\"}");
+      return;
+    }
+
+    String idToken = stateObject["idToken"].getStr();
+    String ssid = stateObject["ssid1"].getStr();
+    String pwd = stateObject["pwd1"].getStr();
+
+    if (idToken.length()) {
+      save_result = SaveAccessToken((char*)idToken.c_str());
+    }
+
+    if (!save_result || !ssid.length() || !pwd.length()) {
+      req->discardRequestBody();
+      res->printStd("{\"message\":\"Failed\", \"resason\":\"2\", \"data\":\"Check token, ssid, and pwd\"}");
+      return;
+    } else {
+      SettingsUpdateText(SET_ID_TOKEN, "TRUE");
+      SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
+      SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
+    }
+
+    res->printStd("{\"message\":\"Success\"}");
+    TasmotaGlobal.restart_flag = 2;
+}
+#endif
 
 #ifdef ESP32
 static uint8_t * tok_spi_start = nullptr;
 const static size_t   tok_spi_len      = 0x0400;  // 1kb blocs
 const static size_t   tok_block_offset = 0x0000;  // don't need offset in FS
-#else
+#elif ESP8266
 // const static uint16_t tls_spi_start_sector = EEPROM_LOCATION + 4;  // 0xXXFF
 // const static uint8_t* tls_spi_start    = (uint8_t*) ((tls_spi_start_sector * SPI_FLASH_SEC_SIZE) + 0x40200000);  // 0x40XFF000
 const static uint16_t tok_spi_start_sector = 0xFF;  // Force last bank of first MB
@@ -381,13 +455,13 @@ void loadAccessToken(void) {
   // We load the file in RAM and use it as if it was in Flash. The buffer is never deallocated once we loaded TLS keys
   AWS_IoT_Private_Key = nullptr;
   if (TfsFileExists(TASM_FILE_TLSKEY)) {
-    if (tls_spi_start == nullptr){
-      tls_spi_start = (uint8_t*) malloc(tls_block_len);
-      if (tls_spi_start == nullptr) {
+    if (tok_spi_start == nullptr){
+      tok_spi_start = (uint8_t*) malloc(tok_block_len);
+      if (tok_spi_start == nullptr) {
         return;
       }
     }
-    TfsLoadFile(TASM_FILE_TLSKEY, tls_spi_start, tls_block_len);
+    TfsLoadFile(TASM_FILE_TLSKEY, tok_spi_start, tok_block_len);
   } else {
     return;   // file does not exist, do nothing
   }
@@ -438,7 +512,13 @@ bool SaveAccessToken(char* accessToken) {
 
   bool save_file = false;   // for ESP32, do we need to write file
 
+#ifdef ESP32
+  if (TfsFileExists(TASM_FILE_TLSKEY)) {
+    TfsDeleteFile(TASM_FILE_TLSKEY);  // delete file
+  }
+#elif ESP8266
   TokEraseBuffer(spi_buffer);   // Erase any previously stored data
+#endif
 
   if (bin_len > 0) {
     // if (bin_len != 32) {
@@ -458,9 +538,15 @@ bool SaveAccessToken(char* accessToken) {
     // if lenght is zero, simply erase this SPI flash area
   }
 
+#ifdef ESP32
+  if (save_file) {
+    TfsSaveFile(TASM_FILE_TLSKEY, spi_buffer, tok_spi_len);
+  }
+#elif ESP8266
   if (ESP.flashEraseSector(tok_spi_start_sector)) {
     ESP.flashWrite(tok_spi_start_sector * SPI_FLASH_SEC_SIZE, (uint32_t*) spi_buffer, SPI_FLASH_SEC_SIZE);
   }
+#endif
 
   free(spi_buffer);
   free(bin_buf);

@@ -1640,7 +1640,13 @@ bool ConvertTlsFile(uint8_t cert) {
 
   printf("buffer ready\n");
   if (!cert) {
+#ifdef ESP32
+  if (TfsFileExists(TASM_FILE_TLSKEY)) {
+    TfsDeleteFile(TASM_FILE_TLSKEY);  // delete file
+  }
+#elif ESP8266
     TlsEraseBuffer(spi_buffer);   // Erase any previously stored data
+#endif
 
     if (bin_len > 0) {
       if (bin_len != 32) {
@@ -1684,9 +1690,15 @@ bool ConvertTlsFile(uint8_t cert) {
     save_file = true;
   }
 
+#ifdef ESP32
+  if (save_file) {
+    TfsSaveFile(TASM_FILE_TLSKEY, spi_buffer, tls_spi_len);
+  }
+#elif ESP8266
   if (ESP.flashEraseSector(tls_spi_start_sector)) {
     ESP.flashWrite(tls_spi_start_sector * SPI_FLASH_SEC_SIZE, (uint32_t*) spi_buffer, SPI_FLASH_SEC_SIZE);
   }
+#endif
 
   free(spi_buffer);
   free(bin_buf);

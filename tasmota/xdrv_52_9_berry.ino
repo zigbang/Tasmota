@@ -642,7 +642,7 @@ void HandleBerryConsoleRefresh(void)
 
 void HandleBerryConsole(void)
 {
-  if (!HttpCheckPriviledgedAccess()) { return; }
+  // if (!HttpCheckPriviledgedAccess()) { return; }
   // int i=16;
   // // AddLog(LOG_LEVEL_INFO, PSTR("Size = %d %d"), sizeof(LList_elt<char[12]>), sizeof(LList_elt<char[0]>)+12);
   // LList_elt<char[0]> * elt = (LList_elt<char[0]>*) ::operator new(sizeof(LList_elt<char[0]>) + 12);
@@ -661,7 +661,7 @@ void HandleBerryConsole(void)
   WSContentFlush();
   _WSContentSend(HTTP_BERRY_STYLE_CMND);
   _WSContentSend(HTTP_BERRY_FORM_CMND);
-  WSContentSpaceButton(BUTTON_MANAGEMENT);
+  // WSContentSpaceButton(BUTTON_MANAGEMENT);
   WSContentStop();
 }
 
@@ -745,14 +745,14 @@ bool Xdrv52(uint8_t function)
     // case FUNC_SET_POWER:
     //   break;
 #ifdef USE_WEBSERVER
-    case FUNC_WEB_ADD_CONSOLE_BUTTON:
-      if (XdrvMailbox.index) {
-        XdrvMailbox.index++;
-      } else {
-        WSContentSend_P(HTTP_BTN_BERRY_CONSOLE);
-        callBerryEventDispatcher(PSTR("web_add_button"), nullptr, 0, nullptr);
-      }
-      break;
+    // case FUNC_WEB_ADD_CONSOLE_BUTTON:
+    //   if (XdrvMailbox.index) {
+    //     XdrvMailbox.index++;
+    //   } else {
+    //     WSContentSend_P(HTTP_BTN_BERRY_CONSOLE);
+    //     callBerryEventDispatcher(PSTR("web_add_button"), nullptr, 0, nullptr);
+    //   }
+    //   break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
       callBerryEventDispatcher(PSTR("web_add_main_button"), nullptr, 0, nullptr);
       break;

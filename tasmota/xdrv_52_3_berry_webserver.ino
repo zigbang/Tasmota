@@ -31,8 +31,8 @@ const be_constint_t webserver_constants[] = {
     { "BUTTON_CONFIGURATION", BUTTON_CONFIGURATION },
     { "BUTTON_INFORMATION", BUTTON_INFORMATION },
     { "BUTTON_MAIN", BUTTON_MAIN },
-    { "BUTTON_MANAGEMENT", BUTTON_MANAGEMENT },
-    { "BUTTON_MODULE", BUTTON_MODULE },
+    // { "BUTTON_MANAGEMENT", BUTTON_MANAGEMENT },
+    // { "BUTTON_MODULE", BUTTON_MODULE },
     { "HTTP_ADMIN", HTTP_ADMIN },
     { "HTTP_ANY", HTTP_ANY },
     { "HTTP_GET", HTTP_GET },
@@ -124,7 +124,7 @@ extern "C" {
   //
   int32_t w_webserver_check_privileged_access(struct bvm *vm);
   int32_t w_webserver_check_privileged_access(struct bvm *vm) {
-    be_pushbool(vm, HttpCheckPriviledgedAccess());
+    // be_pushbool(vm, HttpCheckPriviledgedAccess());
     be_return(vm);
   }
 

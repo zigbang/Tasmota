@@ -60,7 +60,13 @@ const uint16_t HTTP_OTA_RESTART_RECONNECT_TIME = 10000;  // milliseconds - Allow
 
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
+#ifdef ESP8266
 #include <ESP8266WebServerSecure.h>
+#endif
+#ifdef ESP32
+#include <HTTPSServer.hpp>
+using namespace httpsserver;
+#endif
 #include <base64.hpp>
 
 const char HTTP_SCRIPT_ROOT2[] PROGMEM =
@@ -257,21 +263,21 @@ const char HTTP_MSG_SLIDER_GRADIENT[] PROGMEM =
   "<div id='%s' class='r' style='background-image:linear-gradient(to right,%s,%s);'>"
   "<input id='sl%d' type='range' min='%d' max='%d' value='%d' onchange='lc(\"%c\",%d,value)'>"
   "</div>";
-const char HTTP_MSG_SLIDER_SHUTTER[] PROGMEM =
-  "<div><span class='p'>" D_CLOSE "</span><span class='q'>" D_OPEN "</span></div>"
-  "<div><input type='range' min='0' max='100' value='%d' onchange='lc(\"u\",%d,value)'></div>";
+// const char HTTP_MSG_SLIDER_SHUTTER[] PROGMEM =
+//   "<div><span class='p'>" D_CLOSE "</span><span class='q'>" D_OPEN "</span></div>"
+//   "<div><input type='range' min='0' max='100' value='%d' onchange='lc(\"u\",%d,value)'></div>";
 
 const char HTTP_MSG_RSTRT[] PROGMEM =
   "<br><div style='text-align:center;'>" D_DEVICE_WILL_RESTART "</div><br>";
 
-const char HTTP_FORM_LOGIN[] PROGMEM =
-  "<fieldset>"
-  "<form method='post' action='/'>"
-  "<p><b>" D_USER "</b><br><input name='USER1' placeholder='" D_USER "'></p>"
-  "<p><b>" D_PASSWORD "</b><br><input name='PASS1' type='password' placeholder='" D_PASSWORD "'></p>"
-  "<br>"
-  "<button>" D_OK "</button>"
-  "</form></fieldset>";
+// const char HTTP_FORM_LOGIN[] PROGMEM =
+//   "<fieldset>"
+//   "<form method='post' action='/'>"
+//   "<p><b>" D_USER "</b><br><input name='USER1' placeholder='" D_USER "'></p>"
+//   "<p><b>" D_PASSWORD "</b><br><input name='PASS1' type='password' placeholder='" D_PASSWORD "'></p>"
+//   "<br>"
+//   "<button>" D_OK "</button>"
+//   "</form></fieldset>";
 
 const char HTTP_FORM_WIFI_PART1[] PROGMEM =
   "<fieldset><legend><b>&nbsp;" D_WIFI_PARAMETERS "&nbsp;</b></legend>"
@@ -317,8 +323,8 @@ const char HTTP_FORM_CMND[] PROGMEM =
   //  "<br><button type='submit'>Send command</button>"
   "</form>";
 
-const char HTTP_TABLE100[] PROGMEM =
-  "<table style='width:100%%'>";
+// const char HTTP_TABLE100[] PROGMEM =
+//   "<table style='width:100%%'>";
 
 const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
@@ -328,7 +334,7 @@ const char HTTP_END[] PROGMEM =
   "</body>"
   "</html>";
 
-const char HTTP_DEVICE_CONTROL[] PROGMEM = "<td style='width:%d%%'><button onclick='la(\"&o=%d\");'>%s%s</button></td>";  // ?o is related to WebGetArg("o", tmp, sizeof(tmp));
+// const char HTTP_DEVICE_CONTROL[] PROGMEM = "<td style='width:%d%%'><button onclick='la(\"&o=%d\");'>%s%s</button></td>";  // ?o is related to WebGetArg("o", tmp, sizeof(tmp));
 const char HTTP_DEVICE_STATE[] PROGMEM = "<td style='width:%d%%;text-align:center;font-weight:%s;font-size:%dpx'>%s</td>";
 
 enum ButtonTitle {
@@ -363,7 +369,12 @@ char deviceName[10];
 
 DNSServer *DnsServer;
 ESP8266WebServer *Webserver;
+#ifdef ESP8266
 BearSSL::ESP8266WebServerSecure *WebserverSecure;
+#endif
+#ifdef ESP32
+HTTPSServer *WebserverSecure;
+#endif
 
 struct WEB {
   String chunk_buffer = "";                         // Could be max 2 * CHUNKED_BUFFER_SIZE
@@ -580,7 +591,15 @@ void PollDnsWebserver(void)
 {
   if (DnsServer) { DnsServer->processNextRequest(); }
   if (Webserver) { Webserver->handleClient(); }
-  if (WebserverSecure) { WebserverSecure->handleClient(); }
+  if (WebserverSecure)
+  {
+#ifdef ESP8266
+    WebserverSecure->handleClient();
+#endif
+#ifdef ESP32
+    WebserverSecure->loop();
+#endif
+  }
 }
 
 /*********************************************************************************************/
