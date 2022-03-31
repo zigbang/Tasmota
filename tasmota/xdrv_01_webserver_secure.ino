@@ -454,16 +454,17 @@ void loadAccessToken(void) {
 #ifdef ESP32
   // We load the file in RAM and use it as if it was in Flash. The buffer is never deallocated once we loaded TLS keys
   AWS_IoT_Private_Key = nullptr;
-  if (TfsFileExists(TASM_FILE_TLSKEY)) {
-    if (tok_spi_start == nullptr){
+
+  if (tok_spi_start == nullptr){
       tok_spi_start = (uint8_t*) malloc(tok_block_len);
       if (tok_spi_start == nullptr) {
         return;
       }
-    }
-    TfsLoadFile(TASM_FILE_TLSKEY, tok_spi_start, tok_block_len);
-  } else {
-    return;   // file does not exist, do nothing
+  }
+
+  if (!OsalLoadNvm(TASM_FILE_TLSKEY, tok_spi_start, tok_block_len)) {
+    free(tok_spi_start);
+    return;
   }
 #endif
   memcpy_P(&tok_dir, tok_spi_start + tok_block_offset, sizeof(tok_dir));
@@ -540,7 +541,7 @@ bool SaveAccessToken(char* accessToken) {
 
 #ifdef ESP32
   if (save_file) {
-    TfsSaveFile(TASM_FILE_TLSKEY, spi_buffer, tok_spi_len);
+    OsalSaveNvm(TASM_FILE_TLSKEY, spi_buffer, tok_spi_len);
   }
 #elif ESP8266
   if (ESP.flashEraseSector(tok_spi_start_sector)) {
