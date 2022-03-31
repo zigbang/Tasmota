@@ -22,6 +22,8 @@ build_output
 firmware.map
 firmware.asm
 tasmota/tasmota.ino.cpp
+tasmota/tasmota_cert.h
+tasmota/user_config_override.h
 tasmota*.bin
 tasmota*.bin.gz
 tasmota*.map
