@@ -1553,6 +1553,28 @@ static br_x509_certificate CHAIN[] = {
 	{ nullptr, 0 }
 };
 
+bool OsalSaveNvm(char *NvmID, uint8_t *Buffer, int Length)
+{
+  bool ReturnValue = true;
+  TfsSaveFile(NvmID, Buffer, Length);
+  return ReturnValue;
+}
+
+bool OsalLoadNvm(char *NvmID, uint8_t *Buffer, int Length)
+{
+  bool ReturnValue = true;
+
+  if (TfsFileExists(NvmID))
+  {
+    TfsLoadFile(NvmID, Buffer, Length);
+  }
+  else
+  {
+    ReturnValue = false;
+  }
+  return ReturnValue;
+}
+
 // load a copy of the tls_dir from flash into ram
 // and calculate the appropriate data structures for AWS_IoT_Private_Key and AWS_IoT_Client_Certificate
 void loadTlsDir(void) {
@@ -1560,17 +1582,19 @@ void loadTlsDir(void) {
   // We load the file in RAM and use it as if it was in Flash. The buffer is never deallocated once we loaded TLS keys
   AWS_IoT_Private_Key = nullptr;
   AWS_IoT_Client_Certificate = nullptr;
-  if (TfsFileExists(TASM_FILE_TLSKEY)) {
-    if (tls_spi_start == nullptr){
+
+  if (tls_spi_start == nullptr){
       tls_spi_start = (uint8_t*) malloc(tls_block_len);
       if (tls_spi_start == nullptr) {
         return;
       }
-    }
-    TfsLoadFile(TASM_FILE_TLSKEY, tls_spi_start, tls_block_len);
-  } else {
-    return;   // file does not exist, do nothing
   }
+
+  if (!OsalLoadNvm(TASM_FILE_TLSKEY, tls_spi_start, tls_block_len)) {
+    free(tls_spi_start);
+    return;
+  }
+
 #endif
   memcpy_P(&tls_dir, tls_spi_start + tls_block_offset, sizeof(tls_dir));
 
@@ -1692,7 +1716,7 @@ bool ConvertTlsFile(uint8_t cert) {
 
 #ifdef ESP32
   if (save_file) {
-    TfsSaveFile(TASM_FILE_TLSKEY, spi_buffer, tls_spi_len);
+    OsalSaveNvm(TASM_FILE_TLSKEY, spi_buffer, tls_spi_len);
   }
 #elif ESP8266
   if (ESP.flashEraseSector(tls_spi_start_sector)) {
