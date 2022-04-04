@@ -176,6 +176,7 @@ struct {
   uint8_t discovery_counter;                // Delayed discovery counter
   uint8_t idToken_info_flag;                // Zigbang id token from app
   uint8_t cert_info_flag;                   // AWS IoT certification
+  uint8_t ota_init_flag;                    // OTA initialized
 
 #ifndef SUPPORT_IF_STATEMENT
   uint8_t backlog_index;                    // Command backlog index
@@ -308,6 +309,8 @@ void setup(void) {
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
   }
+  sprintf(tmp, "https://%s%s", API_HOST, LAMBDA_OTA_URL);
+  SettingsUpdateText(SET_OTAURL, tmp);
 
   SettingsDelta();
 
