@@ -517,6 +517,7 @@ void StartWebserver(int type, IPAddress ipweb)
         WebServer_on(uri, line.handler, pgm_read_byte(&line.method));
       }
       Webserver->on(F("/frt"), HTTP_GET, HandleFactoryResetConfiguration);
+      Webserver->on(F("/config"), HTTP_POST, HandleConfigurationWithAppForHTTP);
       Webserver->onNotFound(HandleNotFound);
 //      Webserver->on(F("/u2"), HTTP_POST, HandleUploadDone, HandleUploadLoop);  // this call requires 2 functions so we keep a direct call
 #ifndef FIRMWARE_MINIMAL
@@ -1389,6 +1390,45 @@ void HandleFactoryResetConfiguration(void)
   char command[CMDSZ];
   snprintf_P(command, sizeof(command), PSTR(D_CMND_RESET " 2"));
   ExecuteWebCommand(command);
+}
+
+void HandleConfigurationWithAppForHTTP(void) {
+  bool save_result = false;
+
+  if(!Webserver->hasArg(F("plain"))) {
+    WSContentBegin(500, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
+    WSContentEnd();
+    return;
+  }
+
+  JsonParser parser((char*) Webserver->arg("plain").c_str());
+  JsonParserObject stateObject = parser.getRootObject();
+
+  String idToken = stateObject["idToken"].getStr();
+  String ssid = stateObject["ssid1"].getStr();
+  String pwd = stateObject["pwd1"].getStr();
+
+  if (idToken.length()) {
+    save_result = SaveAccessToken((char*)idToken.c_str());
+  }
+
+  if (!save_result || !ssid.length() || !pwd.length()) {
+    WSContentBegin(400, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Failed\" \"resason\":\"2\" \"data\":\"Check token, ssid, and pwd\"}"));
+    WSContentEnd();
+    return;
+  } else {
+    SettingsUpdateText(SET_ID_TOKEN, "TRUE");
+    SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
+    SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
+  }
+
+  WSContentBegin(200, CT_APP_JSON);
+  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
+  WSContentEnd();
+
+  TasmotaGlobal.restart_flag = 2;
 }
 
 void HandleRestoreConfiguration(void)
