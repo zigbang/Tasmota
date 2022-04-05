@@ -1314,7 +1314,7 @@ void Every250mSeconds(void)
       StartMdns();
 
       if (!TasmotaGlobal.ota_init_flag) {
-          if (ArduinoOTA.begin()) {
+          if(HTTPSOTA.begin()) {
             TasmotaGlobal.ota_init_flag = true;
           }
       }
@@ -1348,7 +1348,7 @@ void Every250mSeconds(void)
       }
     } else {
       if (TasmotaGlobal.ota_init_flag) {
-        ArduinoOTA.end();
+        HTTPSOTA.end();
         TasmotaGlobal.ota_init_flag = false;
       }
 
@@ -1379,13 +1379,13 @@ void Every250mSeconds(void)
 bool arduino_ota_triggered = false;
 uint16_t arduino_ota_progress_dot_count = 0;
 
-void ArduinoOTAInit(void)
+void HTTPSOTAInit(void)
 {
-  ArduinoOTA.setPort(443);
-  ArduinoOTA.setHostname(NetworkHostname());
-  ArduinoOTA.setMdnsEnabled(false);
+  HTTPSOTA.setPort(443);
+  HTTPSOTA.setHostname(NetworkHostname());
+  HTTPSOTA.setMdnsEnabled(false);
 
-  ArduinoOTA.onStart([]()
+  HTTPSOTA.onStart([]()
   {
     SettingsSave(1);         // Free flash for OTA update
 #ifdef USE_WEBSERVER
@@ -1406,7 +1406,7 @@ void ArduinoOTAInit(void)
     delay(100);              // Allow time for message xfer
   });
 
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+  HTTPSOTA.onProgress([](unsigned int progress, unsigned int total)
   {
     if ((LOG_LEVEL_DEBUG <= TasmotaGlobal.seriallog_level)) {
       arduino_ota_progress_dot_count++;
@@ -1415,10 +1415,10 @@ void ArduinoOTAInit(void)
     }
   });
 
-  ArduinoOTA.onError([](ota_error_t error)
+  HTTPSOTA.onError([](ota_error_t error)
   {
     /*
-    From ArduinoOTA.h:
+    From HTTPSOTA.h:
     typedef enum { OTA_AUTH_ERROR, OTA_BEGIN_ERROR, OTA_CONNECT_ERROR, OTA_RECEIVE_ERROR, OTA_END_ERROR } ota_error_t;
     */
     char error_str[100];
@@ -1435,7 +1435,7 @@ void ArduinoOTAInit(void)
     EspRestart();
   });
 
-  ArduinoOTA.onEnd([]()
+  HTTPSOTA.onEnd([]()
   {
     if ((LOG_LEVEL_DEBUG <= TasmotaGlobal.seriallog_level)) { Serial.println(); }
     AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA " D_SUCCESSFUL ". " D_RESTARTING));
@@ -1445,14 +1445,14 @@ void ArduinoOTAInit(void)
   AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA " D_ENABLED " " D_PORT " 443"));
 }
 
-void ArduinoOtaLoop(void)
+void HTTPSOtaLoop(void)
 {
 #ifdef ESP8266
   MDNS.update();
 #endif
-  ArduinoOTA.handle();
+  HTTPSOTA.handle();
   // Once OTA is triggered, only handle that and dont do other stuff. (otherwise it fails)
-  while (arduino_ota_triggered) { ArduinoOTA.handle(); }
+  while (arduino_ota_triggered) { HTTPSOTA.handle(); }
 }
 #endif  // USE_ARDUINO_OTA
 

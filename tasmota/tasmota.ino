@@ -41,7 +41,7 @@
 #include <JsonParser.h>
 #include <JsonGenerator.h>
 #ifdef USE_ARDUINO_OTA
-  #include <ArduinoOTA.h>                   // Arduino OTA
+  #include <HTTPSOTA.h>                   // Arduino OTA
   #ifndef USE_DISCOVERY
   #define USE_DISCOVERY
   #endif
@@ -428,7 +428,7 @@ void setup(void) {
 #endif  // FIRMWARE_MINIMAL
 
 #ifdef USE_ARDUINO_OTA
-  ArduinoOTAInit();
+  HTTPSOTAInit();
 #endif  // USE_ARDUINO_OTA
 
   HTTPSClientInit();
@@ -541,7 +541,7 @@ void Scheduler(void) {
   if (!TasmotaGlobal.serial_local) { SerialInput(); }
 
 #ifdef USE_ARDUINO_OTA
-  ArduinoOtaLoop();
+  HTTPSOtaLoop();
 #endif  // USE_ARDUINO_OTA
 }
 
