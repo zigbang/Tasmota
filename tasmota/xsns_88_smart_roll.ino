@@ -9,6 +9,14 @@
 #include "tasmota.h" //
 #include <Ticker.h>
 
+#define MOTOR_DRIVER_PIN1 27
+#define MOTOR_DRIVER_PIN2 26
+#define MOTOR_DRIVER_EN_PIN 28
+
+#define BUTTON_UP 0x00
+#define BUTTON_DOWN 0x01
+#define BUTTON_RST 0x02
+
 Ticker TickerSmartRoll;
 
 struct HeightMemory
@@ -27,6 +35,9 @@ struct SmartRoll
     HeightMemory heightMemory = {
         0,
     };
+    uint8_t calibTop = 0;
+    uint8_t calibBottom = 0;
+    bool directionUp = false;
     bool ready = false;
 } smartRoll;
 
@@ -42,6 +53,15 @@ struct SmartRollDir
     SmartRollEntry entry[3];
 };
 SmartRollDir smartRollDir;
+
+enum SmartRollButtonStates
+{
+    SMART_ROLL_NOT_PRESSED,
+    SMART_ROLL_PRESSED_MULTI,
+    SMART_ROLL_PRESSED_IMMEDIATE,
+    SMART_ROLL_PRESSED_STOP,
+    SMART_ROLL_PRESSED_RST,
+};
 
 const static uint32_t SMART_ROLL_NAME_ID = 0x20646975;        // 'uid ' little endian
 const static uint32_t SMART_ROLL_NAME_REALPOS = 0x20736f70;   // 'pos ' little endian
@@ -158,8 +178,9 @@ void SmartRollInit(void)
         // TODO: IrInit
 
         // 모터 드라이버용 핀 out 설정
-        // pinMode();
-        // pinMode();
+        pinMode(MOTOR_DRIVER_PIN1, OUTPUT);
+        pinMode(MOTOR_DRIVER_PIN2, OUTPUT);
+        pinMode(MOTOR_DRIVER_EN_PIN, OUTPUT);
 
         TickerSmartRoll.attach_ms(50, SmartRollRtc50ms); // -> 타이머 인터럽트 등록
 
@@ -169,12 +190,10 @@ void SmartRollInit(void)
     if (smartRoll.ready)
     {
         printf("[SmartRoll] Successfully initialized Smart Roll\n");
-        // TODO: LED 점등
     }
     else
     {
         printf("[SmartRoll] Failed to initialize Smart Roll\n");
-        // TODO: LED 점등
     }
 }
 
@@ -184,7 +203,114 @@ void SmartRollRtc50ms(void) // 타이머 인러텁트 서비스 루틴
 {
 }
 
-// 물리 버튼 핸들러
+void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
+{
+    uint8_t buttonState = SMART_ROLL_NOT_PRESSED;                          // SmartRoll 컴포넌트에서 관리되는 Button State (SMART_ROLL_NOT_PRESSED, SMART_ROLL_PRESSED_MULTI, ...)
+    uint8_t button = XdrvMailbox.payload;                                  // support_button으로부터 전달받은 Button State (PRESSED, NOT_PRESSED)
+    uint32_t buttonIndex = XdrvMailbox.index;                              // support_button에서 관리되는 Button ID (Default : 8개, Max : 28개)
+    uint8_t smartRollIndex = buttonIndex;                                  // SmartRoll 컴포넌트에서 관리되는 Button ID (Max : 4개)
+    uint16_t loopsPerSec = 1000 / Settings->button_debounce;               // Software debouncing을 위한 loop마다의 비교 시간
+
+    if ((button == PRESSED) && (Button.last_state[buttonIndex] == NOT_PRESSED)) // 버튼이 최초로 눌렸을 때
+    {
+        if (Button.window_timer[buttonIndex] == 0) // 일정 시간 내에 버튼이 눌린 횟수가 0 일 때
+        {
+            buttonState = SMART_ROLL_PRESSED_IMMEDIATE;
+            Button.window_timer[buttonIndex] = (loopsPerSec >> 2);
+        }
+        else // 일정 시간 내에 버튼이 눌린 횟수가 1 이상일 때 (double click)
+        {
+            buttonState = SMART_ROLL_PRESSED_MULTI;
+            Button.window_timer[buttonIndex] = 0;
+        }
+    }
+
+    if (button == NOT_PRESSED) // 버튼이 안눌렸을때
+    {
+        if (smartRollIndex == BUTTON_RST)
+        {
+            Button.hold_timer[buttonIndex] = 0; // Reset 버튼에 대해서만 hold 시간 초기화
+        }
+    }
+    else if (Button.last_state[buttonIndex] == PRESSED) // 버튼이 연속적으로 눌리고 있을때
+    {
+        if (smartRollIndex == BUTTON_RST)
+        {
+            Button.hold_timer[buttonIndex]++;                                                        // Reset 버튼에 대해서만 hold 시간 증가
+            if ((Button.hold_timer[buttonIndex] == loopsPerSec * Settings->param[P_HOLD_TIME] / 10)) // 기준 hold 시간에 도달했을 때
+            {
+                buttonState = SMART_ROLL_PRESSED_RST;
+            }
+        }
+        else
+        {
+            buttonState = SMART_ROLL_PRESSED_IMMEDIATE;
+        }
+    }
+
+    if (Button.window_timer[buttonIndex])
+    {
+        Button.window_timer[buttonIndex]--; // double click 인지를 위한 window_timer는 루프마다 계속 감소
+    }
+
+    if (buttonState != SMART_ROLL_NOT_PRESSED)
+    {
+        switch (buttonState)
+        {
+        case SMART_ROLL_PRESSED_RST:
+            char cmd[20];
+            snprintf_P(cmd, sizeof(cmd), PSTR(D_CMND_FACTORY_RESET));
+            ExecuteCommand(cmd, SRC_BUTTON);
+            break;
+        case SMART_ROLL_PRESSED_MULTI:
+            if (smartRollIndex == BUTTON_UP)
+            {
+                CommandFullUp();
+            }
+            else if (smartRollIndex == BUTTON_DOWN)
+            {
+                CommandFullDown();
+            }
+            break;
+        case SMART_ROLL_PRESSED_IMMEDIATE:
+            if (smartRollIndex == BUTTON_UP)
+            {
+                CommandUp();
+            }
+            else if (smartRollIndex == BUTTON_DOWN)
+            {
+                CommandDown();
+            }
+            break;
+        }
+    }
+
+    Button.last_state[buttonIndex] = button;
+}
+
+void CommandFullUp(void)
+{
+    printf("Full Up!\n");
+}
+
+void CommandFullDown(void)
+{
+    printf("Full Down!\n");
+}
+
+void CommandUp(void)
+{
+    printf("Move Up!\n");
+}
+
+void CommandDown(void)
+{
+    printf("Move Down!\n");
+}
+
+void SmartRollUpdatePosition(void)
+{
+}
 
 // 전류 센서 값 Read API
 
@@ -217,6 +343,7 @@ bool Xsns88(uint8_t function)
         switch (function)
         {
         case FUNC_EVERY_50_MSECOND: // 현재 Position 계산 및 변환, 전류 센서 센싱
+            SmartRollUpdatePosition();
             break;
         case FUNC_JSON_APPEND: // Telemetry용 메시지 조립
             break;
@@ -224,7 +351,8 @@ bool Xsns88(uint8_t function)
             // result = DecodeCommand(kAs608Commands, As608Commands);
             break;
         case FUNC_BUTTON_PRESSED: // 물리 버튼 센싱
-            // ButtonHandler();
+            SmartRollButtonHandler();
+            result = true;
             break;
         }
     }

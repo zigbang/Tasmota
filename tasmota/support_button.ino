@@ -210,6 +210,9 @@ void ButtonHandler(void) {
       if (XdrvCall(FUNC_BUTTON_PRESSED)) {
         // Serviced
       }
+      if (XsnsCall(FUNC_BUTTON_PRESSED)) {
+        // Serviced
+      }
 #ifdef ESP8266
       else if (SONOFF_4CHPRO == TasmotaGlobal.module_type) {
         if (Button.hold_timer[button_index]) { Button.hold_timer[button_index]--; }
