@@ -651,6 +651,9 @@
 #define D_JSON_MOTOR_RPM "setRPM"
 #define D_JSON_MOTOR_MIS "setMIS"
 
+// Commands xsns_88_smart_roll.ino
+#define D_PRFX_SMART_ROLL "SmartRoll"
+
 // Commands xdrv_27_Shutter.ino
 #define D_PRFX_SHUTTER "Shutter"
 #define D_CMND_SHUTTER_OPEN "Open"
