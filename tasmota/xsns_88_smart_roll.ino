@@ -15,7 +15,10 @@
 
 #define BUTTON_UP 0x00
 #define BUTTON_DOWN 0x01
-#define BUTTON_RST 0x02
+#define BUTTON_FUNC 0x02
+#define BUTTON_RST 0x03
+
+#define NUMBER_OF_ENTRIES 5
 
 Ticker TickerSmartRoll;
 
@@ -36,9 +39,12 @@ struct SmartRoll
         0,
     };
     uint8_t calibTop = 0;
-    uint8_t calibBottom = 0;
+    uint8_t calibBottom = 255;
+    uint8_t battery = 100;
+    char* version = "1.0.0";
     bool directionUp = false;
     bool ready = false;
+    bool moving = false;
 } smartRoll;
 
 struct SmartRollEntry
@@ -50,14 +56,15 @@ struct SmartRollEntry
 
 struct SmartRollDir
 {
-    SmartRollEntry entry[3];
+    SmartRollEntry entry[NUMBER_OF_ENTRIES];
 };
 SmartRollDir smartRollDir;
 
 enum SmartRollButtonStates
 {
     SMART_ROLL_NOT_PRESSED,
-    SMART_ROLL_PRESSED_MULTI,
+    SMART_ROLL_PRESSED_DOUBLE,
+    SMART_ROLL_PRESSED_CALIB,
     SMART_ROLL_PRESSED_IMMEDIATE,
     SMART_ROLL_PRESSED_STOP,
     SMART_ROLL_PRESSED_RST,
@@ -66,12 +73,20 @@ enum SmartRollButtonStates
 const static uint32_t SMART_ROLL_NAME_ID = 0x20646975;        // 'uid ' little endian
 const static uint32_t SMART_ROLL_NAME_REALPOS = 0x20736f70;   // 'pos ' little endian
 const static uint32_t SMART_ROLL_NAME_HEIGHTMEM = 0x206d656d; // 'mem ' little endian
+const static uint32_t SMART_ROLL_NAME_CALIBTOP = 0x20706f74; // 'top ' little endian
+const static uint32_t SMART_ROLL_NAME_CALIBBOTTOM = 0x20746f62; // 'bot ' little endian
+
+const static uint32_t SmartRollEntryNames[NUMBER_OF_ENTRIES] = { SMART_ROLL_NAME_ID, SMART_ROLL_NAME_REALPOS, \
+                                                                SMART_ROLL_NAME_HEIGHTMEM, SMART_ROLL_NAME_CALIBTOP, \
+                                                                SMART_ROLL_NAME_CALIBBOTTOM };
 
 static uint8_t *smartRollSpiStart = nullptr;
 const static size_t smartRollSpiLen = 0x0400;      // 1kb
 const static size_t smartRollBlockLen = 0x0400;    // 1kb
 const static size_t smartRollBlockOffset = 0x0000; // don't need offset in FS
 const static size_t smartRollObjStoreOffset = smartRollBlockOffset + sizeof(SmartRollDir);
+
+const char JSON_SMART_ROLL_TELE[] PROGMEM = "\"" D_PRFX_SMART_ROLL "\":{\"Version\":%d,\"Position\":%d%,\"Battery\":%d%}";
 
 int8_t ConvertPercentToRealUnit(int8_t percent)
 {
@@ -113,16 +128,24 @@ bool LoadConfigFromFlash(void)
         {
             memcpy_P(&smartRoll.heightMemory, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[2].start), sizeof(HeightMemory));
         }
+        if ((smartRollDir.entry[3].name == SMART_ROLL_NAME_CALIBTOP) && (smartRollDir.entry[3].len > 0))
+        {
+            memcpy_P(&smartRoll.calibTop, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[3].start), sizeof(uint8_t));
+        }
+        if ((smartRollDir.entry[4].name == SMART_ROLL_NAME_CALIBBOTTOM) && (smartRollDir.entry[4].len > 0))
+        {
+            memcpy_P(&smartRoll.calibBottom, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[4].start), sizeof(uint8_t));
+        }
     }
     free(smartRollSpiStart);
 
     return true;
 }
 
-// TODO: API Interface 변경 -> SmartRoll 구조체 받을 수 있도록
 bool SaveConfigToFlash(void)
 {
     bool result = false;
+    uint8_t buffer[5] = {smartRoll.id, smartRoll.realPosition, 0, smartRoll.calibTop, smartRoll.calibBottom};
 
     uint8_t *spi_buffer = (uint8_t *)malloc(smartRollSpiLen);
     if (!spi_buffer)
@@ -144,12 +167,36 @@ bool SaveConfigToFlash(void)
         SmartRollDir *smart_roll_dir_write;
         smart_roll_dir_write = (SmartRollDir *)(spi_buffer + smartRollBlockOffset);
 
-        SmartRollEntry *entry = &smart_roll_dir_write->entry[0];
-        entry->name = SMART_ROLL_NAME_ID;
-        entry->start = 0;
-        entry->len = sizeof(uint8_t);
-        uint8_t temp = (uint8_t)0x5A;
-        memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, &temp, entry->len);
+        for (int i = 0; i < NUMBER_OF_ENTRIES; i++) {
+            if (i == 0)
+            {
+                SmartRollEntry *entry = &smart_roll_dir_write->entry[i];
+                entry->name = SmartRollEntryNames[i];
+                entry->start = i;
+                entry->len = sizeof(uint8_t);
+                uint8_t temp = buffer[i];
+                memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, &temp, entry->len);
+            }
+            else if (i == 2)
+            {
+                SmartRollEntry *entry = &smart_roll_dir_write->entry[i];
+                entry->name = SmartRollEntryNames[i];
+                entry->start = (smart_roll_dir_write->entry[i - 1].start + smart_roll_dir_write->entry[i - 1].len + 3) & ~0x03;
+                entry->len = sizeof(HeightMemory);
+                HeightMemory temp = smartRoll.heightMemory;
+                memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, &temp, entry->len);
+            }
+            else
+            {
+                SmartRollEntry *entry = &smart_roll_dir_write->entry[i];
+                entry->name = SmartRollEntryNames[i];
+                entry->start = (smart_roll_dir_write->entry[i - 1].start + smart_roll_dir_write->entry[i - 1].len + 3) & ~0x03;
+                entry->len = sizeof(uint8_t);
+                uint8_t temp = buffer[i];
+                memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, &temp, entry->len);
+            }
+        }
+
         OsalSaveNvm("/smart_roll_config", spi_buffer, smartRollSpiLen);
         free(spi_buffer);
         result = true;
@@ -162,7 +209,7 @@ void SmartRollInit(void)
 {
     smartRoll.ready = false;
 
-    if (!LoadConfigFromFlash()) // realPosition, id, heightMemory 플래시로부터 불러오고 저장
+    if (!LoadConfigFromFlash())
     {
         printf("[SmartRoll] Failed to load the config from the flash\n");
     }
@@ -170,10 +217,15 @@ void SmartRollInit(void)
     {
         printf("[SmartRoll] Successfully loaded the config from the flash\nid: %d, realPosition: %d \
     , heightMemory.type1: %d, heightMemory.type2: %d \
-    , heightMemory.type3: %d, heightMemory.type4: %d\n",
-               smartRoll.id, smartRoll.realPosition, smartRoll.heightMemory.type1, smartRoll.heightMemory.type2, smartRoll.heightMemory.type3, smartRoll.heightMemory.type4);
+    , heightMemory.type3: %d, heightMemory.type4: %d \
+    , calibTop: %d, calibBottom: %d\n",
+               smartRoll.id, smartRoll.realPosition, smartRoll.heightMemory.type1, \
+               smartRoll.heightMemory.type2, smartRoll.heightMemory.type3, \
+               smartRoll.heightMemory.type4, smartRoll.calibTop, smartRoll.calibBottom);
 
-        RotaryInit(); // 로터리 엔코더 Init
+        smartRoll.targetPosition = smartRoll.realPosition;
+        
+        RotaryInit();
 
         // TODO: IrInit
 
@@ -182,7 +234,7 @@ void SmartRollInit(void)
         pinMode(MOTOR_DRIVER_PIN2, OUTPUT);
         pinMode(MOTOR_DRIVER_EN_PIN, OUTPUT);
 
-        TickerSmartRoll.attach_ms(50, SmartRollRtc50ms); // -> 타이머 인터럽트 등록
+        TickerSmartRoll.attach_ms(50, SmartRollRtc50ms);
 
         smartRoll.ready = true;
     }
@@ -201,43 +253,76 @@ void SmartRollInit(void)
 
 void SmartRollRtc50ms(void) // 타이머 인러텁트 서비스 루틴
 {
+    if (smartRoll.realPosition != smartRoll.targetPosition)
+    {
+        smartRoll.moving = true;
+        if (smartRoll.realPosition < smartRoll.targetPosition)
+        {
+            // 모터 제어
+            smartRoll.realPosition++; // TODO: 실제로 realPosition 변경은 SmartRollUpdatePosition에서 구현
+            printf("Move Down! realPos : %d, targetPos : %d\n", smartRoll.realPosition, smartRoll.targetPosition);
+        }
+        else if (smartRoll.realPosition > smartRoll.targetPosition)
+        {
+            // 모터 제어
+            smartRoll.realPosition--;
+            printf("Move Up! realPos : %d, targetPos : %d\n", smartRoll.realPosition, smartRoll.targetPosition);
+        }
+    }
+    else
+    {
+        smartRoll.moving = false;
+    }
 }
 
 void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 {
-    uint8_t buttonState = SMART_ROLL_NOT_PRESSED;                          // SmartRoll 컴포넌트에서 관리되는 Button State (SMART_ROLL_NOT_PRESSED, SMART_ROLL_PRESSED_MULTI, ...)
-    uint8_t button = XdrvMailbox.payload;                                  // support_button으로부터 전달받은 Button State (PRESSED, NOT_PRESSED)
-    uint32_t buttonIndex = XdrvMailbox.index;                              // support_button에서 관리되는 Button ID (Default : 8개, Max : 28개)
-    uint8_t smartRollIndex = buttonIndex;                                  // SmartRoll 컴포넌트에서 관리되는 Button ID (Max : 4개)
-    uint16_t loopsPerSec = 1000 / Settings->button_debounce;               // Software debouncing을 위한 loop마다의 비교 시간
+    uint8_t buttonState = SMART_ROLL_NOT_PRESSED;
+    uint8_t button = XdrvMailbox.payload;
+    uint32_t buttonIndex = XdrvMailbox.index;
+    uint8_t smartRollIndex = buttonIndex;
+    uint16_t loopsPerSec = 1000 / Settings->button_debounce;
 
     if ((button == PRESSED) && (Button.last_state[buttonIndex] == NOT_PRESSED)) // 버튼이 최초로 눌렸을 때
     {
-        if (Button.window_timer[buttonIndex] == 0) // 일정 시간 내에 버튼이 눌린 횟수가 0 일 때
+        if (buttonIndex == BUTTON_FUNC)
         {
-            buttonState = SMART_ROLL_PRESSED_IMMEDIATE;
-            Button.window_timer[buttonIndex] = (loopsPerSec >> 2);
+            Button.window_timer[BUTTON_FUNC] = loopsPerSec;
         }
-        else // 일정 시간 내에 버튼이 눌린 횟수가 1 이상일 때 (double click)
+        else
         {
-            buttonState = SMART_ROLL_PRESSED_MULTI;
-            Button.window_timer[buttonIndex] = 0;
+            if (Button.window_timer[buttonIndex] == 0)
+            {
+                if (Button.window_timer[BUTTON_FUNC])
+                {
+                    buttonState = SMART_ROLL_PRESSED_CALIB;
+                    Button.window_timer[BUTTON_FUNC] = 0;
+                }
+                else
+                {
+                    buttonState = SMART_ROLL_PRESSED_IMMEDIATE;
+                    Button.window_timer[buttonIndex] = (loopsPerSec >> 1);
+                }
+            }
+            else
+            {
+                buttonState = SMART_ROLL_PRESSED_DOUBLE;
+                Button.window_timer[buttonIndex] = 0;
+            }
         }
     }
 
     if (button == NOT_PRESSED) // 버튼이 안눌렸을때
     {
-        if (smartRollIndex == BUTTON_RST)
-        {
-            Button.hold_timer[buttonIndex] = 0; // Reset 버튼에 대해서만 hold 시간 초기화
-        }
+        Button.hold_timer[buttonIndex] = 0;
     }
     else if (Button.last_state[buttonIndex] == PRESSED) // 버튼이 연속적으로 눌리고 있을때
     {
+        Button.hold_timer[buttonIndex]++;
+
         if (smartRollIndex == BUTTON_RST)
         {
-            Button.hold_timer[buttonIndex]++;                                                        // Reset 버튼에 대해서만 hold 시간 증가
-            if ((Button.hold_timer[buttonIndex] == loopsPerSec * Settings->param[P_HOLD_TIME] / 10)) // 기준 hold 시간에 도달했을 때
+            if ((Button.hold_timer[buttonIndex] == loopsPerSec * Settings->param[P_HOLD_TIME] / 10))
             {
                 buttonState = SMART_ROLL_PRESSED_RST;
             }
@@ -250,7 +335,7 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 
     if (Button.window_timer[buttonIndex])
     {
-        Button.window_timer[buttonIndex]--; // double click 인지를 위한 window_timer는 루프마다 계속 감소
+        Button.window_timer[buttonIndex]--;
     }
 
     if (buttonState != SMART_ROLL_NOT_PRESSED)
@@ -262,7 +347,7 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
             snprintf_P(cmd, sizeof(cmd), PSTR(D_CMND_FACTORY_RESET));
             ExecuteCommand(cmd, SRC_BUTTON);
             break;
-        case SMART_ROLL_PRESSED_MULTI:
+        case SMART_ROLL_PRESSED_DOUBLE:
             if (smartRollIndex == BUTTON_UP)
             {
                 CommandFullUp();
@@ -272,14 +357,38 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
                 CommandFullDown();
             }
             break;
-        case SMART_ROLL_PRESSED_IMMEDIATE:
+        case SMART_ROLL_PRESSED_CALIB:
             if (smartRollIndex == BUTTON_UP)
             {
-                CommandUp();
+                CommandCalibration(BUTTON_UP);
             }
             else if (smartRollIndex == BUTTON_DOWN)
             {
-                CommandDown();
+                CommandCalibration(BUTTON_DOWN);
+            }
+            break;
+        case SMART_ROLL_PRESSED_IMMEDIATE:
+            if (smartRollIndex == BUTTON_UP)
+            {
+                if (smartRoll.moving && !smartRoll.directionUp)
+                {
+                    CommandStop();
+                }
+                else
+                {
+                    CommandUp();
+                }
+            }
+            else if (smartRollIndex == BUTTON_DOWN)
+            {
+                if (smartRoll.moving && smartRoll.directionUp)
+                {
+                    CommandStop();
+                }
+                else
+                {
+                    CommandDown();
+                }
             }
             break;
         }
@@ -290,22 +399,35 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 
 void CommandFullUp(void)
 {
-    printf("Full Up!\n");
+    smartRoll.directionUp = true;
+    smartRoll.targetPosition = smartRoll.calibTop;
 }
 
 void CommandFullDown(void)
 {
-    printf("Full Down!\n");
+    smartRoll.directionUp = false;
+    smartRoll.targetPosition = smartRoll.calibBottom;
 }
 
 void CommandUp(void)
 {
-    printf("Move Up!\n");
+    if (smartRoll.targetPosition > 0) {
+        smartRoll.directionUp = true;
+        smartRoll.targetPosition--;
+    }
 }
 
 void CommandDown(void)
 {
-    printf("Move Down!\n");
+    if (smartRoll.targetPosition < 255) {
+        smartRoll.directionUp = false;
+        smartRoll.targetPosition++;
+    }
+}
+
+void CommandStop(void)
+{
+    smartRoll.targetPosition = smartRoll.realPosition;
 }
 
 void SmartRollUpdatePosition(void)
@@ -316,15 +438,28 @@ void SmartRollUpdatePosition(void)
 
 // 엔코더 Wrapping API
 
-// IR 메시지 파싱 API
-
-// 채널 등록 API
-
 // Calibration API
+void CommandCalibration(uint8_t direction)
+{
+    printf("Start the calibration for direction : %d to value : %d\n", direction, smartRoll.realPosition);
+
+    if (direction == BUTTON_UP)
+    {
+        smartRoll.calibTop = smartRoll.realPosition;
+    }
+    else
+    {
+        smartRoll.calibBottom = smartRoll.realPosition;
+    }
+
+    SaveConfigToFlash();
+}
 
 // (MQTT 명령 파싱 API)
 
-// MQTT 메시지 조립 API
+// IR 메시지 파싱 API
+
+// 채널 등록 API
 
 /*********************************************************************************************\
 * Interface
@@ -336,7 +471,7 @@ bool Xsns88(uint8_t function)
 
     if (FUNC_PRE_INIT == function)
     {
-        SmartRollInit(); // Init - 플래시에서 현재 높이값 (엔코더), 기기 식별자 (채널), 높이 설정값 불러오기, 타이머 인터럽트 등록 (모터 제어용)
+        SmartRollInit();
     }
     else if (smartRoll.ready)
     {
@@ -345,12 +480,14 @@ bool Xsns88(uint8_t function)
         case FUNC_EVERY_50_MSECOND: // 현재 Position 계산 및 변환, 전류 센서 센싱
             SmartRollUpdatePosition();
             break;
-        case FUNC_JSON_APPEND: // Telemetry용 메시지 조립
+        case FUNC_JSON_APPEND:
+            ResponseAppend_P(",");
+            ResponseAppend_P(JSON_SMART_ROLL_TELE, smartRoll.version, smartRoll.realPosition, smartRoll.battery);
             break;
         case FUNC_COMMAND: // MQTT 명령 파싱
             // result = DecodeCommand(kAs608Commands, As608Commands);
             break;
-        case FUNC_BUTTON_PRESSED: // 물리 버튼 센싱
+        case FUNC_BUTTON_PRESSED:
             SmartRollButtonHandler();
             result = true;
             break;
