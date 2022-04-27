@@ -18,19 +18,22 @@
 #define BUTTON_FUNC 0x02
 #define BUTTON_RST 0x03
 
+#define DEFAULT_VALUE 0
+
 #define NUMBER_OF_ENTRIES 5
 
 #define D_CMND_SMART_ROLL_CONTROL "CONTROL"
 #define D_CMND_SMART_ROLL_REMEMBER "REMEMBER"
+#define D_JSON_SUCCESS "SUCCESS"
 
 Ticker TickerSmartRoll;
 
 struct HeightMemory
 {
-    int8_t type1;
-    int8_t type2;
-    int8_t type3;
-    int8_t type4;
+    uint8_t type1;
+    uint8_t type2;
+    uint8_t type3;
+    uint8_t type4;
 };
 
 struct SmartRoll
@@ -91,12 +94,58 @@ const static size_t smartRollObjStoreOffset = smartRollBlockOffset + sizeof(Smar
 
 const char JSON_SMART_ROLL_TELE[] PROGMEM = "\"" D_PRFX_SMART_ROLL "\":{\"Version\":%d,\"Position\":%d%,\"Battery\":%d%}";
 
-int8_t ConvertPercentToRealUnit(int8_t percent)
+uint8_t ConvertPercentToRealUnit(uint8_t percent)
+{
+    float temp = percent / 100.0f;
+    uint8_t realValue = ((float)(smartRoll.calibBottom - smartRoll.calibTop) * temp) + smartRoll.calibTop;
+    return realValue;
+}
+
+uint8_t ConvertRealToPercentUnit(uint8_t realValue)
 {
 }
 
-int8_t ConvertRealToPercentUnit(int8_t realValue)
+void CommandFullUp(void)
 {
+    smartRoll.directionUp = true;
+    smartRoll.targetPosition = smartRoll.calibTop;
+}
+
+void CommandFullDown(void)
+{
+    smartRoll.directionUp = false;
+    smartRoll.targetPosition = smartRoll.calibBottom;
+}
+
+void CommandUp(uint8_t value = DEFAULT_VALUE)
+{
+    smartRoll.directionUp = true;
+    if ((int)(smartRoll.targetPosition - value) > 0)
+    {
+        (value == DEFAULT_VALUE) ? smartRoll.targetPosition-- : smartRoll.targetPosition -= value;
+    }
+    else 
+    {
+        smartRoll.targetPosition = 0;
+    }
+}
+
+void CommandDown(uint8_t value = DEFAULT_VALUE)
+{
+    smartRoll.directionUp = false;
+    if ((int)(smartRoll.targetPosition + value) < 255)
+    {
+        (value == DEFAULT_VALUE) ? smartRoll.targetPosition++ : smartRoll.targetPosition += value;
+    }
+    else
+    {
+        smartRoll.targetPosition = 255;
+    }
+}
+
+void CommandStop(void)
+{
+    smartRoll.targetPosition = smartRoll.realPosition;
 }
 
 bool LoadConfigFromFlash(void)
@@ -404,39 +453,6 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
     Button.last_state[buttonIndex] = button;
 }
 
-void CommandFullUp(void)
-{
-    smartRoll.directionUp = true;
-    smartRoll.targetPosition = smartRoll.calibTop;
-}
-
-void CommandFullDown(void)
-{
-    smartRoll.directionUp = false;
-    smartRoll.targetPosition = smartRoll.calibBottom;
-}
-
-void CommandUp(void)
-{
-    if (smartRoll.targetPosition > 0) {
-        smartRoll.directionUp = true;
-        smartRoll.targetPosition--;
-    }
-}
-
-void CommandDown(void)
-{
-    if (smartRoll.targetPosition < 255) {
-        smartRoll.directionUp = false;
-        smartRoll.targetPosition++;
-    }
-}
-
-void CommandStop(void)
-{
-    smartRoll.targetPosition = smartRoll.realPosition;
-}
-
 void SmartRollUpdatePosition(void)
 {
 }
@@ -462,24 +478,106 @@ void CommandCalibration(uint8_t direction)
     SaveConfigToFlash();
 }
 
-void CmndSmartRollControll(void)
+bool CmndSmartRollControll(void)
 {
   char buffer[4];
+  bool result = false;
+
   if (XdrvMailbox.data_len > 0)
   {
+    uint8_t value = 0;
+    uint8_t converted = 0;
+
     memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
-    printf("Command Control! value : %s\n", buffer);
+
+    if (buffer[0] == '-')
+    {
+        value = atoi(&buffer[1]);
+        converted = ConvertPercentToRealUnit(value);
+        if (converted != DEFAULT_VALUE)
+        {
+            CommandUp(converted);
+        }
+    }
+    else if (buffer[0] == 'M')
+    {
+        switch(buffer[1])
+        {
+            case '1':
+                value = smartRoll.heightMemory.type1;
+            break;
+            case '2':
+                value = smartRoll.heightMemory.type2;
+            break;
+            case '3':
+                value = smartRoll.heightMemory.type3;
+            break;
+            case '4':
+                value = smartRoll.heightMemory.type4;
+            break;
+            default:
+                return result;
+        }
+        
+        if (smartRoll.realPosition > value)
+        {
+            CommandUp(smartRoll.realPosition - value);
+        }
+        else if (smartRoll.realPosition < value)
+        {
+            CommandDown(value - smartRoll.realPosition);
+        }
+    }
+    else
+    {
+        value = atoi(&buffer[0]);
+        converted = ConvertPercentToRealUnit(value);
+        if (converted != DEFAULT_VALUE)
+        {
+            CommandDown(converted);
+        }
+    }
+
+    result = true;
   }
+
+  return result;
 }
 
-void CmndSmartRollRemember(void)
+bool CmndSmartRollRemember(void)
 {
   char buffer[4];
+  bool result = false;
+
   if (XdrvMailbox.data_len > 0)
   {
     memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
-    printf("Command Remember! value : %s\n", buffer);
+
+    switch(buffer[1])
+    {
+        case '1':
+            smartRoll.heightMemory.type1 = smartRoll.realPosition;
+        break;
+        case '2':
+            smartRoll.heightMemory.type2 = smartRoll.realPosition;
+        break;
+        case '3':
+            smartRoll.heightMemory.type3 = smartRoll.realPosition;
+        break;
+        case '4':
+            smartRoll.heightMemory.type4 = smartRoll.realPosition;
+        break;
+        default:
+            return result;
+    }
+
+    if (SaveConfigToFlash())
+    {
+        result = true;
+    }
   }
+
+  return result;
 }
 
 // MQTT 명령 파싱 API
@@ -487,15 +585,21 @@ bool SmartRollMQTTCommand(void)
 {
     bool result = false;
 
-    if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_CONTROL))
+    if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_CONTROL) == 0)
     {
-        CmndSmartRollControll();
-        result = true;
+        if (CmndSmartRollControll())
+        {
+            Response_P(PSTR("{\"" D_CMND_SMART_ROLL_CONTROL "\":\"" D_JSON_SUCCESS "\"}"));
+            result = true;
+        }
     }
-    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_REMEMBER))
+    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_REMEMBER) == 0)
     {
-        CmndSmartRollRemember();
-        result = true;
+        if (CmndSmartRollRemember())
+        {
+            Response_P(PSTR("{\"" D_CMND_SMART_ROLL_REMEMBER "\":\"" D_JSON_SUCCESS "\"}"));
+            result = true;
+        }
     }
 
     return result;
@@ -530,7 +634,6 @@ bool Xsns88(uint8_t function)
             ResponseAppend_P(JSON_SMART_ROLL_TELE, smartRoll.version, smartRoll.realPosition, smartRoll.battery);
             break;
         case FUNC_COMMAND: // MQTT 명령 파싱
-            printf("received command!\n");
             result = SmartRollMQTTCommand();
             break;
         case FUNC_BUTTON_PRESSED:
