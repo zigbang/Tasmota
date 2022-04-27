@@ -20,6 +20,9 @@
 
 #define NUMBER_OF_ENTRIES 5
 
+#define D_CMND_SMART_ROLL_CONTROL "CONTROL"
+#define D_CMND_SMART_ROLL_REMEMBER "REMEMBER"
+
 Ticker TickerSmartRoll;
 
 struct HeightMemory
@@ -345,6 +348,10 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
         case SMART_ROLL_PRESSED_RST:
             char cmd[20];
             snprintf_P(cmd, sizeof(cmd), PSTR(D_CMND_FACTORY_RESET));
+            if (TfsFileExists("/smart_roll_config"))
+            {
+                TfsDeleteFile("/smart_roll_config");
+            }
             ExecuteCommand(cmd, SRC_BUTTON);
             break;
         case SMART_ROLL_PRESSED_DOUBLE:
@@ -455,7 +462,44 @@ void CommandCalibration(uint8_t direction)
     SaveConfigToFlash();
 }
 
-// (MQTT 명령 파싱 API)
+void CmndSmartRollControll(void)
+{
+  char buffer[4];
+  if (XdrvMailbox.data_len > 0)
+  {
+    memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
+    printf("Command Control! value : %s\n", buffer);
+  }
+}
+
+void CmndSmartRollRemember(void)
+{
+  char buffer[4];
+  if (XdrvMailbox.data_len > 0)
+  {
+    memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
+    printf("Command Remember! value : %s\n", buffer);
+  }
+}
+
+// MQTT 명령 파싱 API
+bool SmartRollMQTTCommand(void)
+{
+    bool result = false;
+
+    if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_CONTROL))
+    {
+        CmndSmartRollControll();
+        result = true;
+    }
+    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_REMEMBER))
+    {
+        CmndSmartRollRemember();
+        result = true;
+    }
+
+    return result;
+}
 
 // IR 메시지 파싱 API
 
@@ -482,10 +526,12 @@ bool Xsns88(uint8_t function)
             break;
         case FUNC_JSON_APPEND:
             ResponseAppend_P(",");
+            // TODO: telemetry 전송 시, version 정보 정확하게 전송되도록 데이터 변환
             ResponseAppend_P(JSON_SMART_ROLL_TELE, smartRoll.version, smartRoll.realPosition, smartRoll.battery);
             break;
         case FUNC_COMMAND: // MQTT 명령 파싱
-            // result = DecodeCommand(kAs608Commands, As608Commands);
+            printf("received command!\n");
+            result = SmartRollMQTTCommand();
             break;
         case FUNC_BUTTON_PRESSED:
             SmartRollButtonHandler();
