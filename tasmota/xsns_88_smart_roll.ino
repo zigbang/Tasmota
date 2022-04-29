@@ -9,9 +9,17 @@
 #include "tasmota.h" //
 #include <Ticker.h>
 
-#define MOTOR_DRIVER_PIN1 27
+#define CURRENT_NORMAL 0.017800f
+#define CURRENT_BASE 0.08f
+
+#define ENCODER_PINA 32
+#define ENCODER_PINB 33
+#define ENCODER_MAX 255000.0f
+#define ENCODER_MIN 0.0f
+
+#define MOTOR_DRIVER_PIN1 25
 #define MOTOR_DRIVER_PIN2 26
-#define MOTOR_DRIVER_EN_PIN 28
+#define MOTOR_DRIVER_EN_PIN 27
 
 #define BUTTON_UP 0x00
 #define BUTTON_DOWN 0x01
@@ -27,6 +35,19 @@
 #define D_JSON_SUCCESS "SUCCESS"
 
 Ticker TickerSmartRoll;
+
+uint32_t cp0_regs[18];
+DRAM_ATTR float ENCODER_MISC = 0.5;
+
+struct Encoder
+{
+    volatile float counter = 0.0;
+    volatile uint8_t currentState = 255;
+    volatile uint8_t lastState = 255;
+    uint8_t pinA = ENCODER_PINA;
+    uint8_t pinB = ENCODER_PINB;
+    bool ready = false;
+} encoder;
 
 struct HeightMemory
 {
@@ -101,10 +122,6 @@ uint8_t ConvertPercentToRealUnit(uint8_t percent)
     return realValue;
 }
 
-uint8_t ConvertRealToPercentUnit(uint8_t realValue)
-{
-}
-
 void CommandFullUp(void)
 {
     smartRoll.directionUp = true;
@@ -146,6 +163,69 @@ void CommandDown(uint8_t value = DEFAULT_VALUE)
 void CommandStop(void)
 {
     smartRoll.targetPosition = smartRoll.realPosition;
+}
+
+void IRAM_ATTR EncoderUpdater(void)
+{
+    uint32_t cp_state = xthal_get_cpenable();
+    
+    if(cp_state) {
+        xthal_save_cp0(cp0_regs);
+    } else {
+        xthal_set_cpenable(1);
+    }
+
+    encoder.currentState = digitalRead(encoder.pinA);
+
+    if ((encoder.currentState != encoder.lastState) && (encoder.currentState == HIGH))
+    {
+        if (digitalRead(encoder.pinB) != encoder.currentState)
+        {
+            if (encoder.counter < ENCODER_MAX)
+            {
+                encoder.counter += ENCODER_MISC;
+                if (encoder.counter > ENCODER_MAX)
+                {
+                    encoder.counter = ENCODER_MAX;
+                }
+            }
+        }
+        else
+        {
+            if (encoder.counter > ENCODER_MIN)
+            {
+                encoder.counter -= ENCODER_MISC;
+                if (encoder.counter < ENCODER_MIN)
+                {
+                    encoder.counter = ENCODER_MIN;
+                }
+            }
+        }
+    }
+
+    if(cp_state) {
+        xthal_restore_cp0(cp0_regs);
+    } else {
+        xthal_set_cpenable(0);
+    }
+
+    encoder.lastState = encoder.currentState;
+}
+
+void EncoderInit(void)
+{
+    encoder.ready = false;
+
+    pinMode(encoder.pinA, INPUT);
+    pinMode(encoder.pinB, INPUT);
+
+    encoder.lastState = digitalRead(encoder.pinA);
+    attachInterrupt(digitalPinToInterrupt(encoder.pinA), EncoderUpdater, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(encoder.pinB), EncoderUpdater, CHANGE);
+
+    encoder.counter = smartRoll.realPosition * 100;
+
+    encoder.ready = true;
 }
 
 bool LoadConfigFromFlash(void)
@@ -277,11 +357,9 @@ void SmartRollInit(void)
 
         smartRoll.targetPosition = smartRoll.realPosition;
         
-        RotaryInit();
-
+        EncoderInit();
         // TODO: IrInit
 
-        // 모터 드라이버용 핀 out 설정
         pinMode(MOTOR_DRIVER_PIN1, OUTPUT);
         pinMode(MOTOR_DRIVER_PIN2, OUTPUT);
         pinMode(MOTOR_DRIVER_EN_PIN, OUTPUT);
@@ -301,8 +379,6 @@ void SmartRollInit(void)
     }
 }
 
-// Position 계산 및 변환 API
-
 void SmartRollRtc50ms(void) // 타이머 인러텁트 서비스 루틴
 {
     if (smartRoll.realPosition != smartRoll.targetPosition)
@@ -311,18 +387,22 @@ void SmartRollRtc50ms(void) // 타이머 인러텁트 서비스 루틴
         if (smartRoll.realPosition < smartRoll.targetPosition)
         {
             // 모터 제어
-            smartRoll.realPosition++; // TODO: 실제로 realPosition 변경은 SmartRollUpdatePosition에서 구현
+            digitalWrite(MOTOR_DRIVER_PIN1, HIGH);
+            digitalWrite(MOTOR_DRIVER_PIN2, LOW);
             printf("Move Down! realPos : %d, targetPos : %d\n", smartRoll.realPosition, smartRoll.targetPosition);
         }
         else if (smartRoll.realPosition > smartRoll.targetPosition)
         {
             // 모터 제어
-            smartRoll.realPosition--;
+            digitalWrite(MOTOR_DRIVER_PIN1, LOW);
+            digitalWrite(MOTOR_DRIVER_PIN2, HIGH);
             printf("Move Up! realPos : %d, targetPos : %d\n", smartRoll.realPosition, smartRoll.targetPosition);
         }
+        digitalWrite(MOTOR_DRIVER_EN_PIN, HIGH);
     }
     else
     {
+        digitalWrite(MOTOR_DRIVER_EN_PIN, LOW);
         smartRoll.moving = false;
     }
 }
@@ -366,6 +446,10 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 
     if (button == NOT_PRESSED) // 버튼이 안눌렸을때
     {
+        if (((buttonIndex == BUTTON_DOWN) || (buttonIndex == BUTTON_UP)) && Button.hold_timer[buttonIndex])
+        {
+            CommandStop();
+        }
         Button.hold_timer[buttonIndex] = 0;
     }
     else if (Button.last_state[buttonIndex] == PRESSED) // 버튼이 연속적으로 눌리고 있을때
@@ -455,17 +539,39 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 
 void SmartRollUpdatePosition(void)
 {
+    if (smartRoll.moving) {
+        int converted = (int)(encoder.counter / 100);
+        if (converted > 255)
+        {
+            converted = 255;
+        }
+        else if (converted < 0)
+        {
+            converted = 0;
+        }
+        smartRoll.realPosition = converted;
+    }
 }
 
 // 전류 센서 값 Read API
+bool DetectAbnormal(void)
+{
+    bool result = false;
 
-// 엔코더 Wrapping API
+    if (smartRoll.moving)
+    {
+        if (ina219_current[0] > CURRENT_NORMAL + CURRENT_BASE)
+        {
+            result = true;
+        }
+    }
+
+    return result;
+}
 
 // Calibration API
 void CommandCalibration(uint8_t direction)
 {
-    printf("Start the calibration for direction : %d to value : %d\n", direction, smartRoll.realPosition);
-
     if (direction == BUTTON_UP)
     {
         smartRoll.calibTop = smartRoll.realPosition;
@@ -621,19 +727,26 @@ bool Xsns88(uint8_t function)
     {
         SmartRollInit();
     }
-    else if (smartRoll.ready)
+    else if (encoder.ready && smartRoll.ready)
     {
         switch (function)
         {
-        case FUNC_EVERY_50_MSECOND: // 현재 Position 계산 및 변환, 전류 센서 센싱
+        case FUNC_LOOP:
             SmartRollUpdatePosition();
             break;
+        case FUNC_EVERY_50_MSECOND:
+            if (DetectAbnormal())
+            {
+                CommandStop();
+            }
+            break;
         case FUNC_JSON_APPEND:
+            SaveConfigToFlash();
             ResponseAppend_P(",");
             // TODO: telemetry 전송 시, version 정보 정확하게 전송되도록 데이터 변환
             ResponseAppend_P(JSON_SMART_ROLL_TELE, smartRoll.version, smartRoll.realPosition, smartRoll.battery);
             break;
-        case FUNC_COMMAND: // MQTT 명령 파싱
+        case FUNC_COMMAND:
             result = SmartRollMQTTCommand();
             break;
         case FUNC_BUTTON_PRESSED:
