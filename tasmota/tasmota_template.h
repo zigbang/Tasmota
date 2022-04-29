@@ -2601,14 +2601,14 @@ const mytmplt kModules[] PROGMEM = {
     AGPIO(GPIO_USER),            // 13      IO                  GPIO13, ADC2_CH4, TOUCH4, RTC_GPIO14, MTCK, HSPID, HS2_DATA3, SD_DATA3, EMAC_RX_ER
     AGPIO(GPIO_USER),            // 14      IO                  GPIO14, ADC2_CH6, TOUCH6, RTC_GPIO16, MTMS, HSPICLK, HS2_CLK, SD_CLK, EMAC_TXD2
     AGPIO(GPIO_USER),            // 15      (I)O                GPIO15, ADC2_CH3, TOUCH3, MTDO, HSPICS0, RTC_GPIO13, HS2_CMD, SD_CMD, EMAC_RXD3         (If driven Low, silences boot messages from normal boot. Has internal pull-up, so unconnected = High = normal output.)
-    AGPIO(GPIO_USER),            // 16      IO                  GPIO16, HS1_DATA4, U2RXD, EMAC_CLK_OUT
-    AGPIO(GPIO_USER),            // 17      IO                  GPIO17, HS1_DATA5, U2TXD, EMAC_CLK_OUT_180
-    AGPIO(GPIO_USER),            // 18      IO                  GPIO18, VSPICLK, HS1_DATA7
-    AGPIO(GPIO_KEY1),            // 19      IO                  GPIO19, VSPIQ, U0CTS, EMAC_TXD0
+    AGPIO(GPIO_KEY1),            // 16      IO                  GPIO16, HS1_DATA4, U2RXD, EMAC_CLK_OUT
+    AGPIO(GPIO_KEY1) + 1,        // 17      IO                  GPIO17, HS1_DATA5, U2TXD, EMAC_CLK_OUT_180
+    AGPIO(GPIO_KEY1) + 2,        // 18      IO                  GPIO18, VSPICLK, HS1_DATA7
+    AGPIO(GPIO_KEY1) + 3,        // 19      IO                  GPIO19, VSPIQ, U0CTS, EMAC_TXD0
     0,                           // 20
-    AGPIO(GPIO_KEY1) + 1,            // 21      IO                  GPIO21, VSPIHD, EMAC_TX_EN
-    AGPIO(GPIO_KEY1) + 2,            // 22      IO      LED         GPIO22, VSPIWP, U0RTS, EMAC_TXD1
-    AGPIO(GPIO_KEY1) + 3,            // 23      IO                  GPIO23, VSPID, HS1_STROBE
+    AGPIO(GPIO_I2C_SDA),            // 21      IO                  GPIO21, VSPIHD, EMAC_TX_EN
+    AGPIO(GPIO_I2C_SCL),            // 22      IO      LED         GPIO22, VSPIWP, U0RTS, EMAC_TXD1
+    AGPIO(GPIO_USER),            // 23      IO                  GPIO23, VSPID, HS1_STROBE
     0,                           // 24
     AGPIO(GPIO_USER),            // 25      IO                  GPIO25, DAC_1, ADC2_CH8, RTC_GPIO6, EMAC_RXD0
     AGPIO(GPIO_USER),            // 26      IO                  GPIO26, DAC_2, ADC2_CH9, RTC_GPIO7, EMAC_RXD1

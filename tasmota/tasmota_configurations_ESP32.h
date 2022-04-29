@@ -359,7 +359,8 @@
 #endif // FIRMWARE_TASMOTA32
 
 #ifdef FIRMWARE_SMART_ROLL
-#define ROTARY_V1
+#undef ROTARY_V1
+#define USE_INA219
 #endif // FIRMWARE_SMART_ROLL
 
 #endif // ESP32
