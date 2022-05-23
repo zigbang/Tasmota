@@ -9,8 +9,11 @@
 #include "tasmota.h" //
 #include <Ticker.h>
 
-#define CURRENT_NORMAL 0.017800f
-#define CURRENT_BASE 0.08f
+#define MAX_SCHEDULE_COUNT 4
+
+#define CURRENT_BASE 0.10f
+#define DIRECTION_UP_NORMAL_CURRENT 0.19000f
+#define DIRECTION_DOWN_NORMAL_CURRENT 0.15000f
 
 #define ENCODER_PINA 32
 #define ENCODER_PINB 33
@@ -28,11 +31,28 @@
 
 #define DEFAULT_VALUE 0
 
-#define NUMBER_OF_ENTRIES 5
+#define NUMBER_OF_ENTRIES 6
+
+#define MEMORY_TYPE_1 '1'
+#define MEMORY_TYPE_2 '2'
+#define MEMORY_TYPE_3 '3'
+#define MEMORY_TYPE_4 '4'
 
 #define D_CMND_SMART_ROLL_CONTROL "CONTROL"
 #define D_CMND_SMART_ROLL_REMEMBER "REMEMBER"
+#define D_CMND_SMART_ROLL_STOP "STOP"
 #define D_JSON_SUCCESS "SUCCESS"
+#define D_CMND_SMART_ROLL_CALIBRATION "CALIBRATION"
+#define D_CMND_SMART_ROLL_SCHEDULE "SCHEDULE"
+
+#define MQTT_PAYLOAD_TOP_UPPER_CASE 'T'
+#define MQTT_PAYLOAD_TOP_LOWER_CASE 't'
+#define MQTT_PAYLOAD_BOTTOM_UPPER_CASE 'B'
+#define MQTT_PAYLOAD_BOTTOM_LOWER_CASE 'b'
+#define MQTT_PAYLOAD_UP_UPPER_CASE 'U'
+#define MQTT_PAYLOAD_UP_LOWER_CASE 'u'
+#define MQTT_PAYLOAD_DOWN_UPPER_CASE 'D'
+#define MQTT_PAYLOAD_DOWN_LOWER_CASE 'd'
 
 Ticker TickerSmartRoll;
 
@@ -60,15 +80,20 @@ struct HeightMemory
 struct SmartRoll
 {
     uint8_t id = 0x00;
-    uint8_t realPosition = 0;
+    uint8_t realPosition = 127;
     uint8_t targetPosition = 0;
     HeightMemory heightMemory = {
         0,
     };
+    uint8_t scheduleMemory[MAX_SCHEDULE_COUNT][3] = { // 행 - schedule 종류, 열 - schedule 값 (첫 번째 인덱스 - 시간, 두 번째 인덱스 - 분, 세 번째 인덱스 - 값)
+        {255, 255, 255},
+        {255, 255, 255},
+        {255, 255, 255},
+        {255, 255, 255}};
     uint8_t calibTop = 0;
     uint8_t calibBottom = 255;
     uint8_t battery = 100;
-    char* version = "1.0.0";
+    char *version = "1.0.0";
     bool directionUp = false;
     bool ready = false;
     bool moving = false;
@@ -97,15 +122,16 @@ enum SmartRollButtonStates
     SMART_ROLL_PRESSED_RST,
 };
 
-const static uint32_t SMART_ROLL_NAME_ID = 0x20646975;        // 'uid ' little endian
-const static uint32_t SMART_ROLL_NAME_REALPOS = 0x20736f70;   // 'pos ' little endian
-const static uint32_t SMART_ROLL_NAME_HEIGHTMEM = 0x206d656d; // 'mem ' little endian
-const static uint32_t SMART_ROLL_NAME_CALIBTOP = 0x20706f74; // 'top ' little endian
+const static uint32_t SMART_ROLL_NAME_ID = 0x20646975;          // 'uid ' little endian
+const static uint32_t SMART_ROLL_NAME_REALPOS = 0x20736f70;     // 'pos ' little endian
+const static uint32_t SMART_ROLL_NAME_HEIGHTMEM = 0x20746768;   // 'hgt ' little endian
+const static uint32_t SMART_ROLL_NAME_SCHEDULEMEM = 0x206d656d; // 'sch ' little endian
+const static uint32_t SMART_ROLL_NAME_CALIBTOP = 0x20686373;    // 'top ' little endian
 const static uint32_t SMART_ROLL_NAME_CALIBBOTTOM = 0x20746f62; // 'bot ' little endian
 
-const static uint32_t SmartRollEntryNames[NUMBER_OF_ENTRIES] = { SMART_ROLL_NAME_ID, SMART_ROLL_NAME_REALPOS, \
-                                                                SMART_ROLL_NAME_HEIGHTMEM, SMART_ROLL_NAME_CALIBTOP, \
-                                                                SMART_ROLL_NAME_CALIBBOTTOM };
+const static uint32_t SmartRollEntryNames[NUMBER_OF_ENTRIES] = {SMART_ROLL_NAME_ID, SMART_ROLL_NAME_REALPOS,
+                                                                SMART_ROLL_NAME_HEIGHTMEM, SMART_ROLL_NAME_SCHEDULEMEM,
+                                                                SMART_ROLL_NAME_CALIBTOP, SMART_ROLL_NAME_CALIBBOTTOM};
 
 static uint8_t *smartRollSpiStart = nullptr;
 const static size_t smartRollSpiLen = 0x0400;      // 1kb
@@ -113,7 +139,20 @@ const static size_t smartRollBlockLen = 0x0400;    // 1kb
 const static size_t smartRollBlockOffset = 0x0000; // don't need offset in FS
 const static size_t smartRollObjStoreOffset = smartRollBlockOffset + sizeof(SmartRollDir);
 
-const char JSON_SMART_ROLL_TELE[] PROGMEM = "\"" D_PRFX_SMART_ROLL "\":{\"Version\":%d,\"Position\":%d%,\"Battery\":%d%}";
+const char JSON_SMART_ROLL_TELE[] PROGMEM = "\"" D_PRFX_SMART_ROLL "\":{\"Version\":%s,\"Position\":%d%,\"Battery\":%d%}";
+
+static uint8_t minuteCount = 0;
+
+void UpdateShadow(char *payload)
+{
+    char topic[64];
+    char awsPayload[60];
+
+    snprintf_P(topic, sizeof(topic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
+    snprintf_P(awsPayload, sizeof(awsPayload), PSTR("{\"state\":{\"reported\":%s}}"), payload);
+
+    MqttClient.publish(topic, awsPayload, false);
+}
 
 uint8_t ConvertPercentToRealUnit(uint8_t percent)
 {
@@ -141,7 +180,7 @@ void CommandUp(uint8_t value = DEFAULT_VALUE)
     {
         (value == DEFAULT_VALUE) ? smartRoll.targetPosition-- : smartRoll.targetPosition -= value;
     }
-    else 
+    else
     {
         smartRoll.targetPosition = 0;
     }
@@ -163,15 +202,21 @@ void CommandDown(uint8_t value = DEFAULT_VALUE)
 void CommandStop(void)
 {
     smartRoll.targetPosition = smartRoll.realPosition;
+    printf("Command Stop!\n");
+
+    UpdateShadow("{\"movnig\":\"stop\"}");
 }
 
 void IRAM_ATTR EncoderUpdater(void)
 {
     uint32_t cp_state = xthal_get_cpenable();
-    
-    if(cp_state) {
+
+    if (cp_state)
+    {
         xthal_save_cp0(cp0_regs);
-    } else {
+    }
+    else
+    {
         xthal_set_cpenable(1);
     }
 
@@ -203,9 +248,12 @@ void IRAM_ATTR EncoderUpdater(void)
         }
     }
 
-    if(cp_state) {
+    if (cp_state)
+    {
         xthal_restore_cp0(cp0_regs);
-    } else {
+    }
+    else
+    {
         xthal_set_cpenable(0);
     }
 
@@ -260,13 +308,17 @@ bool LoadConfigFromFlash(void)
         {
             memcpy_P(&smartRoll.heightMemory, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[2].start), sizeof(HeightMemory));
         }
-        if ((smartRollDir.entry[3].name == SMART_ROLL_NAME_CALIBTOP) && (smartRollDir.entry[3].len > 0))
+        if ((smartRollDir.entry[3].name == SMART_ROLL_NAME_SCHEDULEMEM) && (smartRollDir.entry[3].len > 0))
         {
-            memcpy_P(&smartRoll.calibTop, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[3].start), sizeof(uint8_t));
+            memcpy_P(&smartRoll.scheduleMemory, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[3].start), sizeof(uint8_t) * MAX_SCHEDULE_COUNT * 3);
         }
-        if ((smartRollDir.entry[4].name == SMART_ROLL_NAME_CALIBBOTTOM) && (smartRollDir.entry[4].len > 0))
+        if ((smartRollDir.entry[4].name == SMART_ROLL_NAME_CALIBTOP) && (smartRollDir.entry[4].len > 0))
         {
-            memcpy_P(&smartRoll.calibBottom, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[4].start), sizeof(uint8_t));
+            memcpy_P(&smartRoll.calibTop, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[4].start), sizeof(uint8_t));
+        }
+        if ((smartRollDir.entry[5].name == SMART_ROLL_NAME_CALIBBOTTOM) && (smartRollDir.entry[5].len > 0))
+        {
+            memcpy_P(&smartRoll.calibBottom, (smartRollSpiStart + smartRollObjStoreOffset + smartRollDir.entry[5].start), sizeof(uint8_t));
         }
     }
     free(smartRollSpiStart);
@@ -277,7 +329,7 @@ bool LoadConfigFromFlash(void)
 bool SaveConfigToFlash(void)
 {
     bool result = false;
-    uint8_t buffer[5] = {smartRoll.id, smartRoll.realPosition, 0, smartRoll.calibTop, smartRoll.calibBottom};
+    uint8_t buffer[NUMBER_OF_ENTRIES] = {smartRoll.id, smartRoll.realPosition, 0, 0, smartRoll.calibTop, smartRoll.calibBottom};
 
     uint8_t *spi_buffer = (uint8_t *)malloc(smartRollSpiLen);
     if (!spi_buffer)
@@ -299,7 +351,8 @@ bool SaveConfigToFlash(void)
         SmartRollDir *smart_roll_dir_write;
         smart_roll_dir_write = (SmartRollDir *)(spi_buffer + smartRollBlockOffset);
 
-        for (int i = 0; i < NUMBER_OF_ENTRIES; i++) {
+        for (int i = 0; i < NUMBER_OF_ENTRIES; i++)
+        {
             if (i == 0)
             {
                 SmartRollEntry *entry = &smart_roll_dir_write->entry[i];
@@ -317,6 +370,14 @@ bool SaveConfigToFlash(void)
                 entry->len = sizeof(HeightMemory);
                 HeightMemory temp = smartRoll.heightMemory;
                 memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, &temp, entry->len);
+            }
+            else if (i == 3)
+            {
+                SmartRollEntry *entry = &smart_roll_dir_write->entry[i];
+                entry->name = SmartRollEntryNames[i];
+                entry->start = (smart_roll_dir_write->entry[i - 1].start + smart_roll_dir_write->entry[i - 1].len + 3) & ~0x03;
+                entry->len = sizeof(uint8_t) * MAX_SCHEDULE_COUNT * 3;
+                memcpy(spi_buffer + smartRollObjStoreOffset + entry->start, smartRoll.scheduleMemory, entry->len);
             }
             else
             {
@@ -350,13 +411,20 @@ void SmartRollInit(void)
         printf("[SmartRoll] Successfully loaded the config from the flash\nid: %d, realPosition: %d \
     , heightMemory.type1: %d, heightMemory.type2: %d \
     , heightMemory.type3: %d, heightMemory.type4: %d \
+    , scheduleMemory.type1: %dh%dm%dv, scheduleMemory.type2: %dh%dm%dv \
+    , scheduleMemory.type3: %dh%dm%dv, scheduleMemory.type4: %dh%dm%dv \
     , calibTop: %d, calibBottom: %d\n",
-               smartRoll.id, smartRoll.realPosition, smartRoll.heightMemory.type1, \
-               smartRoll.heightMemory.type2, smartRoll.heightMemory.type3, \
-               smartRoll.heightMemory.type4, smartRoll.calibTop, smartRoll.calibBottom);
+               smartRoll.id, smartRoll.realPosition, smartRoll.heightMemory.type1,
+               smartRoll.heightMemory.type2, smartRoll.heightMemory.type3,
+               smartRoll.heightMemory.type4,
+               smartRoll.scheduleMemory[0][0], smartRoll.scheduleMemory[0][1], smartRoll.scheduleMemory[0][2],
+               smartRoll.scheduleMemory[1][0], smartRoll.scheduleMemory[1][1], smartRoll.scheduleMemory[1][2],
+               smartRoll.scheduleMemory[2][0], smartRoll.scheduleMemory[2][1], smartRoll.scheduleMemory[2][2],
+               smartRoll.scheduleMemory[3][0], smartRoll.scheduleMemory[3][1], smartRoll.scheduleMemory[3][2],
+               smartRoll.calibTop, smartRoll.calibBottom);
 
         smartRoll.targetPosition = smartRoll.realPosition;
-        
+
         EncoderInit();
         // TODO: IrInit
 
@@ -539,7 +607,8 @@ void SmartRollButtonHandler(void) // 물리 버튼 핸들러 API
 
 void SmartRollUpdatePosition(void)
 {
-    if (smartRoll.moving) {
+    if (smartRoll.moving)
+    {
         int converted = (int)(encoder.counter / 100);
         if (converted > 255)
         {
@@ -560,9 +629,20 @@ bool DetectAbnormal(void)
 
     if (smartRoll.moving)
     {
-        if (ina219_current[0] > CURRENT_NORMAL + CURRENT_BASE)
+        // printf("current value : %f\n", ina219_current[0]);
+        if (smartRoll.directionUp)
         {
-            result = true;
+            if (ina219_current[0] > DIRECTION_UP_NORMAL_CURRENT + CURRENT_BASE)
+            {
+                result = true;
+            }
+        }
+        else
+        {
+            if (ina219_current[0] > DIRECTION_DOWN_NORMAL_CURRENT + CURRENT_BASE)
+            {
+                result = true;
+            }
         }
     }
 
@@ -586,104 +666,178 @@ void CommandCalibration(uint8_t direction)
 
 bool CmndSmartRollControll(void)
 {
-  char buffer[4];
-  bool result = false;
+    char buffer[4];
+    bool result = false;
 
-  if (XdrvMailbox.data_len > 0)
-  {
-    uint8_t value = 0;
-    uint8_t converted = 0;
-
-    memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
-
-    if (buffer[0] == '-')
+    if (XdrvMailbox.data_len > 0)
     {
-        value = atoi(&buffer[1]);
-        converted = ConvertPercentToRealUnit(value);
-        if (converted != DEFAULT_VALUE)
+        uint8_t value = 0;
+        uint8_t converted = 0;
+
+        memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
+
+        if (buffer[0] == '-')
         {
-            CommandUp(converted);
+            value = atoi(&buffer[1]);
+            converted = ConvertPercentToRealUnit(value);
+            if (converted != DEFAULT_VALUE)
+            {
+                CommandUp(converted);
+            }
         }
-    }
-    else if (buffer[0] == 'M')
-    {
-        switch(buffer[1])
+        else if (buffer[0] == 'M')
         {
-            case '1':
+            switch (buffer[1])
+            {
+            case MEMORY_TYPE_1:
                 value = smartRoll.heightMemory.type1;
-            break;
-            case '2':
+                break;
+            case MEMORY_TYPE_2:
                 value = smartRoll.heightMemory.type2;
-            break;
-            case '3':
+                break;
+            case MEMORY_TYPE_3:
                 value = smartRoll.heightMemory.type3;
-            break;
-            case '4':
+                break;
+            case MEMORY_TYPE_4:
                 value = smartRoll.heightMemory.type4;
-            break;
+                break;
             default:
                 return result;
+            }
+
+            if (smartRoll.realPosition > value)
+            {
+                CommandUp(smartRoll.realPosition - value);
+            }
+            else if (smartRoll.realPosition < value)
+            {
+                CommandDown(value - smartRoll.realPosition);
+            }
         }
-        
-        if (smartRoll.realPosition > value)
+        else if (buffer[0] == MQTT_PAYLOAD_TOP_UPPER_CASE || buffer[0] == MQTT_PAYLOAD_TOP_LOWER_CASE)
         {
-            CommandUp(smartRoll.realPosition - value);
+            CommandFullUp();
         }
-        else if (smartRoll.realPosition < value)
+        else if (buffer[0] == MQTT_PAYLOAD_BOTTOM_UPPER_CASE || buffer[0] == MQTT_PAYLOAD_BOTTOM_LOWER_CASE)
         {
-            CommandDown(value - smartRoll.realPosition);
+            CommandFullDown();
         }
-    }
-    else
-    {
-        value = atoi(&buffer[0]);
-        converted = ConvertPercentToRealUnit(value);
-        if (converted != DEFAULT_VALUE)
+        else
         {
-            CommandDown(converted);
+            value = atoi(&buffer[0]);
+            converted = ConvertPercentToRealUnit(value);
+            if (converted != DEFAULT_VALUE)
+            {
+                CommandDown(converted);
+            }
         }
+
+        result = true;
     }
 
-    result = true;
-  }
-
-  return result;
+    return result;
 }
 
 bool CmndSmartRollRemember(void)
 {
-  char buffer[4];
-  bool result = false;
+    char buffer[4];
+    bool result = false;
 
-  if (XdrvMailbox.data_len > 0)
-  {
-    memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
-
-    switch(buffer[1])
+    if (XdrvMailbox.data_len > 0)
     {
-        case '1':
+        memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
+
+        switch (buffer[1])
+        {
+        case MEMORY_TYPE_1:
             smartRoll.heightMemory.type1 = smartRoll.realPosition;
-        break;
-        case '2':
+            break;
+        case MEMORY_TYPE_2:
             smartRoll.heightMemory.type2 = smartRoll.realPosition;
-        break;
-        case '3':
+            break;
+        case MEMORY_TYPE_3:
             smartRoll.heightMemory.type3 = smartRoll.realPosition;
-        break;
-        case '4':
+            break;
+        case MEMORY_TYPE_4:
             smartRoll.heightMemory.type4 = smartRoll.realPosition;
-        break;
+            break;
         default:
             return result;
+        }
+
+        if (SaveConfigToFlash())
+        {
+            result = true;
+        }
     }
 
-    if (SaveConfigToFlash())
+    return result;
+}
+
+bool CmndCalib(void)
+{
+    char buffer[5];
+    bool result = false;
+
+    if (XdrvMailbox.data_len > 0)
     {
-        result = true;
-    }
-  }
+        memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
 
-  return result;
+        if (buffer[0] == MQTT_PAYLOAD_UP_UPPER_CASE || buffer[0] == MQTT_PAYLOAD_UP_LOWER_CASE)
+        {
+            CommandCalibration(BUTTON_UP);
+            result = true;
+        }
+        else if (buffer[0] == MQTT_PAYLOAD_DOWN_UPPER_CASE || buffer[0] == MQTT_PAYLOAD_DOWN_LOWER_CASE)
+        {
+            CommandCalibration(BUTTON_DOWN);
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+void CmndSchedule(void)
+{
+    char buffer[25];
+
+    memcpy_P(buffer, XdrvMailbox.data, sizeof(buffer));
+
+    uint8_t hour = atoi(&buffer[0]);
+    uint8_t minute = atoi(&buffer[3]);
+
+    smartRoll.scheduleMemory[(int)buffer[23] - 49][0] = hour;
+    smartRoll.scheduleMemory[(int)buffer[23] - 49][1] = minute;
+
+    switch (buffer[24])
+    {
+    case MQTT_PAYLOAD_TOP_UPPER_CASE:
+    case MQTT_PAYLOAD_TOP_LOWER_CASE:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.calibTop;
+        break;
+    case MQTT_PAYLOAD_BOTTOM_UPPER_CASE:
+    case MQTT_PAYLOAD_BOTTOM_LOWER_CASE:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.calibBottom;
+        break;
+    case MEMORY_TYPE_1:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.heightMemory.type1;
+        break;
+    case MEMORY_TYPE_2:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.heightMemory.type2;
+        break;
+    case MEMORY_TYPE_3:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.heightMemory.type3;
+        break;
+    case MEMORY_TYPE_4:
+        smartRoll.scheduleMemory[(int)buffer[23] - 49][2] = smartRoll.heightMemory.type4;
+        break;
+    default:
+        break;
+    }
+
+    SaveConfigToFlash();
+    // 플래시 및 전역 변수에 저장
 }
 
 // MQTT 명령 파싱 API
@@ -707,8 +861,52 @@ bool SmartRollMQTTCommand(void)
             result = true;
         }
     }
+    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_STOP) == 0)
+    {
+        CommandStop();
+        Response_P(PSTR("{\"" D_CMND_SMART_ROLL_STOP "\":\"" D_JSON_SUCCESS "\"}"));
+        result = true;
+    }
+    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_CALIBRATION) == 0)
+    {
+        if (CmndCalib())
+        {
+            Response_P(PSTR("{\"" D_CMND_SMART_ROLL_CALIBRATION "\":\"" D_JSON_SUCCESS "\"}"));
+            result = true;
+        }
+    }
+    else if (strcmp(XdrvMailbox.topic, D_CMND_SMART_ROLL_SCHEDULE) == 0)
+    {
+        CmndSchedule();
+        Response_P(PSTR("{\"" D_CMND_SMART_ROLL_SCHEDULE "\":\"" D_JSON_SUCCESS "\"}"));
+        result = true;
+    }
 
     return result;
+}
+
+void CheckSchedule(void)
+{
+    if (!TasmotaGlobal.global_state.network_down)
+    {
+        for (uint8_t i = 0; i < MAX_SCHEDULE_COUNT; i++)
+        {
+            char buffer[20];
+            memcpy_P(buffer, GetDateAndTime(DT_LOCAL).c_str(), sizeof(buffer));
+
+            uint8_t hour = atoi(&buffer[11]) + 8;
+            if (hour >= 24)
+            {
+                hour -= 24;
+            }
+            uint8_t minute = atoi(&buffer[14]);
+
+            if (smartRoll.scheduleMemory[i][0] == hour && smartRoll.scheduleMemory[i][1] == minute)
+            {
+                smartRoll.targetPosition = smartRoll.scheduleMemory[i][2];
+            }
+        }
+    }
 }
 
 // IR 메시지 파싱 API
@@ -739,6 +937,14 @@ bool Xsns88(uint8_t function)
             {
                 CommandStop();
             }
+            break;
+        case FUNC_EVERY_SECOND:
+            if (minuteCount == 60)
+            {
+                CheckSchedule();
+                minuteCount = 0;
+            }
+            minuteCount++;
             break;
         case FUNC_JSON_APPEND:
             SaveConfigToFlash();
