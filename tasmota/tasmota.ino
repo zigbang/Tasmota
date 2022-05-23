@@ -41,7 +41,11 @@
 #include <JsonParser.h>
 #include <JsonGenerator.h>
 #ifdef USE_ARDUINO_OTA
+#ifdef ESP32
   #include <HTTPSOTA.h>                   // Arduino OTA
+#elif ESP8266
+  #include <ArduinoOTA.h>
+#endif
   #ifndef USE_DISCOVERY
   #define USE_DISCOVERY
   #endif
@@ -263,6 +267,7 @@ void setup(void) {
   }
   Serial.begin(TasmotaGlobal.baudrate);
   Serial.println();
+  printf("free mem when init : %d\n", ESP.getFreeHeap());
 //  Serial.setRxBufferSize(INPUT_BUFFER_SIZE);  // Default is 256 chars
   TasmotaGlobal.seriallog_level = LOG_LEVEL_INFO;  // Allow specific serial messages until config loaded
 
@@ -291,7 +296,9 @@ void setup(void) {
   UfsInit();  // xdrv_50_filesystem.ino
 #endif
 
+  printf("free mem before settings load : %d\n", ESP.getFreeHeap());
   SettingsLoad();
+  printf("free mem after settings load : %d\n", ESP.getFreeHeap());
 
   // TODO: 모듈화
   char tmp[TOPSZ];
@@ -311,6 +318,8 @@ void setup(void) {
   }
   sprintf(tmp, "https://%s%s", API_HOST, LAMBDA_OTA_URL);
   SettingsUpdateText(SET_OTAURL, tmp);
+
+  printf("free mem after string setting : %d\n", ESP.getFreeHeap());
 
   SettingsDelta();
 
@@ -404,6 +413,8 @@ void setup(void) {
   mac_address.~String();
   mac_part.~String();
 
+  printf("free mem before module initialization : %d\n", ESP.getFreeHeap());
+
   RtcInit();
   GpioInit();
   ButtonInit();
@@ -414,6 +425,8 @@ void setup(void) {
 #ifdef USE_BERRY
   BerryInit();
 #endif // USE_BERRY
+
+printf("free mem after module initialization : %d\n", ESP.getFreeHeap());
 
   XdrvCall(FUNC_PRE_INIT);
   XsnsCall(FUNC_PRE_INIT);
@@ -428,10 +441,18 @@ void setup(void) {
 #endif  // FIRMWARE_MINIMAL
 
 #ifdef USE_ARDUINO_OTA
+#ifdef ESP32
   HTTPSOTAInit();
+#elif ESP8266
+  ArduinoOTAInit();
+#endif
 #endif  // USE_ARDUINO_OTA
 
+printf("free mem after xdrv, xsns call : %d\n", ESP.getFreeHeap());
+
   HTTPSClientInit();
+
+printf("free mem after https client init : %d\n", ESP.getFreeHeap());
 
   XdrvCall(FUNC_INIT);
   XsnsCall(FUNC_INIT);
@@ -440,6 +461,8 @@ void setup(void) {
 #endif
 
   TasmotaGlobal.rules_flag.system_init = 1;
+
+  printf("free mem at the end of setup : %d\n", ESP.getFreeHeap());
 }
 
 void BacklogLoop(void) {
@@ -541,7 +564,11 @@ void Scheduler(void) {
   if (!TasmotaGlobal.serial_local) { SerialInput(); }
 
 #ifdef USE_ARDUINO_OTA
+#ifdef ESP32
   HTTPSOtaLoop();
+#elif ESP8266
+  ArduinoOtaLoop();
+#endif
 #endif  // USE_ARDUINO_OTA
 }
 
@@ -551,6 +578,8 @@ void loop(void) {
   Scheduler();
 
   uint32_t my_activity = millis() - my_sleep;
+
+  // printf("free mem : %d\n", ESP.getFreeHeap());
 
   if (Settings->flag3.sleep_normal) {               // SetOption60 - Enable normal sleep instead of dynamic sleep
     //  yield();                                   // yield == delay(0), delay contains yield, auto yield in loop

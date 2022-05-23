@@ -2,9 +2,9 @@
     xsns_88_smart_roll.ino - ESP32 Temperature and Hall Effect sensor for Tasmota
 */
 
+#ifdef FIRMWARE_SMART_ROLL
 #define XSNS_88 88
 
-#ifdef FIRMWARE_SMART_ROLL
 #include <Arduino.h> //
 #include "tasmota.h" //
 #include <Ticker.h>

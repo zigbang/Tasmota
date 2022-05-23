@@ -16,7 +16,9 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef ESP32
 #include <WiFiClientSecure.h>
+#endif
 
 const char kSleepMode[] PROGMEM = "Dynamic|Normal";
 const char kPrefixes[] PROGMEM = D_CMND "|" D_STAT "|" D_TELE;
@@ -1093,7 +1095,11 @@ void Every250mSeconds(void)
       if (2 == TasmotaGlobal.ota_state_flag) {
         RtcSettings.ota_loader = 0;                       // Try requested image first
         ota_retry_counter = OTA_ATTEMPTS;
+#ifdef ESP32
         ESPhttpsUpdate.rebootOnUpdate(false);
+#elif ESP8266
+        ESPhttpUpdate.rebootOnUpdate(false);
+#endif
         SettingsSave(1);                                  // Free flash for OTA update
       }
       if (TasmotaGlobal.ota_state_flag <= 0) {
@@ -1162,12 +1168,24 @@ void Every250mSeconds(void)
           char version[50];
           snprintf_P(version, sizeof(version), PSTR("%s%s"), TasmotaGlobal.version, TasmotaGlobal.image_name);
           AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_UPLOAD "%s %s"), full_ota_url, version);
+#ifdef ESP32
           WiFiClientSecure *OTAclient = new WiFiClientSecure;
           OTAclient->setCACert(rootCA1);
+#elif ESP8266
+          WiFiClient OTAclient;
+#endif
+#ifdef ESP32
           ota_result = (HTTP_UPDATE_FAILED != ESPhttpsUpdate.update(*OTAclient, full_ota_url, version, rootCA1));
+#elif ESP8266
+          ota_result = (HTTP_UPDATE_FAILED != ESPhttpUpdate.update(OTAclient, full_ota_url, version));
+#endif
           if (!ota_result) {
 #ifndef FIRMWARE_MINIMAL
+#ifdef ESP32
             int ota_error = ESPhttpsUpdate.getLastError();
+#elif ESP8266
+            int ota_error = ESPhttpUpdate.getLastError();
+#endif
             DEBUG_CORE_LOG(PSTR("OTA: Error %d"), ota_error);
 #ifdef ESP8266
             if ((HTTP_UE_TOO_LESS_SPACE == ota_error) || (HTTP_UE_BIN_FOR_WRONG_FLASH == ota_error)) {
@@ -1186,7 +1204,11 @@ void Every250mSeconds(void)
           ResponseAppend_P(PSTR(D_JSON_SUCCESSFUL ". " D_JSON_RESTARTING));
           TasmotaGlobal.restart_flag = 2;
         } else {
+#ifdef ESP32
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpsUpdate.getLastErrorString().c_str());
+#elif ESP8266
+          ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdate.getLastErrorString().c_str());
+#endif
         }
         ResponseAppend_P(PSTR("\"}"));
 //        TasmotaGlobal.restart_flag = 2;                   // Restart anyway to keep memory clean webserver
@@ -1313,16 +1335,23 @@ void Every250mSeconds(void)
 #endif  // FIRMWARE_MINIMAL
       StartMdns();
 
+#ifdef USE_ARDUINO_OTA
       if (!TasmotaGlobal.ota_init_flag) {
+#ifdef ESP32
           if(HTTPSOTA.begin()) {
             TasmotaGlobal.ota_init_flag = true;
           }
+#elif ESP8266
+          ArduinoOTA.begin();
+          TasmotaGlobal.ota_init_flag = true;
+#endif
       }
+#endif // USE_ARDUINO_OTA
 
 #ifdef USE_WEBSERVER
       if (!Settings->webserver) {
         StopWebserver();
-        StopWebserverSecure();
+        // StopWebserverSecure();
       }
 #ifdef USE_EMULATION
       if (Settings->flag2.emulation) { UdpConnect(); }
@@ -1348,7 +1377,9 @@ void Every250mSeconds(void)
       }
     } else {
       if (TasmotaGlobal.ota_init_flag) {
+#ifdef ESP32
         HTTPSOTA.end();
+#endif
         TasmotaGlobal.ota_init_flag = false;
       }
 
@@ -1379,6 +1410,7 @@ void Every250mSeconds(void)
 bool arduino_ota_triggered = false;
 uint16_t arduino_ota_progress_dot_count = 0;
 
+#ifdef ESP32
 void HTTPSOTAInit(void)
 {
   HTTPSOTA.setPort(443);
@@ -1454,6 +1486,83 @@ void HTTPSOtaLoop(void)
   // Once OTA is triggered, only handle that and dont do other stuff. (otherwise it fails)
   while (arduino_ota_triggered) { HTTPSOTA.handle(); }
 }
+#elif ESP8266
+void ArduinoOTAInit(void)
+{
+  ArduinoOTA.setPort(443);
+  ArduinoOTA.setHostname(NetworkHostname());
+  // ArduinoOTA.setMdnsEnabled(false);
+
+  ArduinoOTA.onStart([]()
+  {
+    SettingsSave(1);         // Free flash for OTA update
+#ifdef USE_WEBSERVER
+    if (Settings->webserver) {
+      StopWebserver();
+      // StopWebserverSecure();
+    }
+#endif  // USE_WEBSERVER
+#ifdef USE_ARILUX_RF
+    AriluxRfDisable();       // Prevent restart exception on Arilux Interrupt routine
+#endif  // USE_ARILUX_RF
+    if (Settings->flag.mqtt_enabled) {
+      MqttDisconnect();      // SetOption3  - Enable MQTT
+    }
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA " D_UPLOAD_STARTED));
+    arduino_ota_triggered = true;
+    arduino_ota_progress_dot_count = 0;
+    delay(100);              // Allow time for message xfer
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+  {
+    if ((LOG_LEVEL_DEBUG <= TasmotaGlobal.seriallog_level)) {
+      arduino_ota_progress_dot_count++;
+      Serial.printf(".");
+      if (!(arduino_ota_progress_dot_count % 80)) { Serial.println(); }
+    }
+  });
+
+  ArduinoOTA.onError([](ota_error_t error)
+  {
+    /*
+    From ArduinoOTA.h:
+    typedef enum { OTA_AUTH_ERROR, OTA_BEGIN_ERROR, OTA_CONNECT_ERROR, OTA_RECEIVE_ERROR, OTA_END_ERROR } ota_error_t;
+    */
+    char error_str[100];
+
+    if ((LOG_LEVEL_DEBUG <= TasmotaGlobal.seriallog_level) && arduino_ota_progress_dot_count) { Serial.println(); }
+    switch (error) {
+      case OTA_BEGIN_ERROR: strncpy_P(error_str, PSTR(D_UPLOAD_ERR_2), sizeof(error_str)); break;
+      case OTA_RECEIVE_ERROR: strncpy_P(error_str, PSTR(D_UPLOAD_ERR_5), sizeof(error_str)); break;
+      case OTA_END_ERROR: strncpy_P(error_str, PSTR(D_UPLOAD_ERR_7), sizeof(error_str)); break;
+      default:
+        snprintf_P(error_str, sizeof(error_str), PSTR(D_UPLOAD_ERROR_CODE " %d"), error);
+    }
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA  %s. " D_RESTARTING), error_str);
+    EspRestart();
+  });
+
+  ArduinoOTA.onEnd([]()
+  {
+    if ((LOG_LEVEL_DEBUG <= TasmotaGlobal.seriallog_level)) { Serial.println(); }
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA " D_SUCCESSFUL ". " D_RESTARTING));
+    EspRestart();
+	});
+
+  AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UPLOAD "Arduino OTA " D_ENABLED " " D_PORT " 443"));
+}
+
+void ArduinoOtaLoop(void)
+{
+#ifdef ESP8266
+  MDNS.update();
+#endif
+  ArduinoOTA.handle();
+  // Once OTA is triggered, only handle that and dont do other stuff. (otherwise it fails)
+  while (arduino_ota_triggered) { ArduinoOTA.handle(); }
+}
+#endif
 #endif  // USE_ARDUINO_OTA
 
 /********************************************************************************************/
