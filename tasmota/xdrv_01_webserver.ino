@@ -16,8 +16,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include <iostream>
 
 #ifdef USE_WEBSERVER
+#define NO_CAPTIVE_PORTAL
 /*********************************************************************************************\
  * Web server and WiFi Manager
  *
@@ -585,7 +587,7 @@ void WifiManagerBegin(bool reset_only)
   DnsServer->start(DNS_PORT, "*", WiFi.softAPIP());
 
   StartWebserver((reset_only ? HTTP_MANAGER_RESET_ONLY : HTTP_MANAGER), WiFi.softAPIP());
-  StartWebserverSecure();
+  // StartWebserverSecure();
 }
 
 void PollDnsWebserver(void)
@@ -1425,7 +1427,8 @@ void HandleConfigurationWithAppForHTTP(void) {
   }
 
   WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\"}"));
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"deviceId\":\"%s\"}"), SettingsText(SET_MQTT_CLIENT));
+
   WSContentEnd();
 
   TasmotaGlobal.restart_flag = 2;
