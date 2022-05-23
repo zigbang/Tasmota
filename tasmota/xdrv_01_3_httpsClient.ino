@@ -37,7 +37,7 @@ char* trimRight(char* s) {
 
 void GetCertification(void) {
     const char host[] = API_HOST;
-    String url = LAMBDA_CERT_URL + NetworkUniqueId();
+    String url = LAMBDA_CERT_URL + String(SettingsText(SET_MQTT_TOPIC));
 
     if ((nullptr == AWS_IoT_Private_Key) || !client.connect(host, 443)) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
