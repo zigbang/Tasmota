@@ -165,7 +165,7 @@ const uint8_t OTA_ATTEMPTS = 10;            // Number of times to try fetching t
 const uint8_t OTA_ATTEMPTS = 5;             // Number of times to try fetching the new firmware
 #endif  // ESP8266
 
-const uint16_t FLOATSZ = 16;                // Max number of characters in float result from dtostrfd (max 32)
+const uint16_t FLOATSZ = 1;                // Max number of characters in float result from dtostrfd (max 32)
 const uint16_t CMDSZ = 24;                  // Max number of characters in command
 const uint16_t TOPSZ = 70;                 // Max number of characters in topic string
 
