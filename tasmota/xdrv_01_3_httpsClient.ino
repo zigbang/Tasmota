@@ -1,3 +1,4 @@
+#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
@@ -47,7 +48,7 @@ void GetCertification(void) {
         client.print(String("GET ") + url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
                     "User-Agent: Zigbang\r\n" +
-                    "Authorization: " + (char*)AWS_IoT_Private_Key->x +"\r\n" +
+                    "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
                     "Connection: close\r\n\r\n");
 
         String headers = "";
@@ -59,7 +60,7 @@ void GetCertification(void) {
         unsigned long timeout = millis();
         while (!client.available()) {
             if (millis() - timeout > 20000) {
-                printf("시간초과!\n");
+                printf_P(PSTR("시간초과!\n"));
                 client.stop();
                 return;
             }
@@ -88,9 +89,9 @@ void GetCertification(void) {
             gotResponse = true;
         }
         if (gotResponse) {
-            if (headers.startsWith("HTTP/1.1 200")) {
+            if (headers.startsWith(PSTR("HTTP/1.1 200"))) {
                 AddLog(LOG_LEVEL_INFO, PSTR("요청 성공"));
-                printf("body : %s", (char*) body.c_str());
+                // printf_P(PSTR("body : %s"), (char*) body.c_str());
 #ifdef ESP32
                 char* temp = trimRight((char*) body.c_str());
                 JsonParser parser(temp);
@@ -156,3 +157,4 @@ void ProvisioningCheck(void) {
         GetCertification();
     }
 }
+#endif  // FIRMWARE_ZIOT_SONOFF_MINIMAL
