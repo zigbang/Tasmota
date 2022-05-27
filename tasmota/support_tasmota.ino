@@ -19,6 +19,7 @@
 #ifdef ESP32
 #include <WiFiClientSecure.h>
 #endif
+#include "tasmota.h"
 
 const char kSleepMode[] PROGMEM = "Dynamic|Normal";
 const char kPrefixes[] PROGMEM = D_CMND "|" D_STAT "|" D_TELE;
@@ -806,7 +807,7 @@ void TempHumDewShow(bool json, bool pass_on, const char *types, float f_temperat
 #endif  // USE_KNX
 #ifdef USE_WEBSERVER
   } else {
-    WSContentSend_THD(types, f_temperature, f_humidity);
+    // WSContentSend_THD(types, f_temperature, f_humidity);
 #endif  // USE_WEBSERVER
   }
 }
@@ -1208,6 +1209,9 @@ void Every250mSeconds(void)
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpsUpdate.getLastErrorString().c_str());
 #elif ESP8266
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdate.getLastErrorString().c_str());
+#ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
+          TasmotaGlobal.initial_ota_try = false;
+#endif
 #endif
         }
         ResponseAppend_P(PSTR("\"}"));
@@ -1369,12 +1373,22 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
+#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
       if (TasmotaGlobal.idToken_info_flag) {
         // 프로비저닝 모드
         ProvisioningCheck();
       } else {
         MqttCheck();
       }
+#endif
+#ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
+      if (!TasmotaGlobal.initial_ota_try) {
+        char command[TOPSZ + 10];
+        snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
+        ExecuteCommand(command, SRC_IGNORE);
+        TasmotaGlobal.initial_ota_try = true;
+      }
+#endif
     } else {
       if (TasmotaGlobal.ota_init_flag) {
 #ifdef ESP32
@@ -1557,12 +1571,12 @@ void ArduinoOtaLoop(void)
 {
 #ifdef ESP8266
   MDNS.update();
-#endif
+#endif  // ESP8266
   ArduinoOTA.handle();
   // Once OTA is triggered, only handle that and dont do other stuff. (otherwise it fails)
   while (arduino_ota_triggered) { ArduinoOTA.handle(); }
 }
-#endif
+#endif  // ESP8266
 #endif  // USE_ARDUINO_OTA
 
 /********************************************************************************************/

@@ -2342,9 +2342,9 @@ const mytmplt8266 kModules8266[TMP_MAXMODULE_8285] PROGMEM = {
 
 const mytmplt8285 kModules8285[TMP_MAXMODULE_8266 - TMP_WEMOS] PROGMEM = {
   {                     // WEMOS - Any ESP8266/ESP8285 device like WeMos and NodeMCU hardware (ESP8266)
-    GPI8_USER,          // GPIO00 D3 Wemos Button Shield
+    GPI8_KEY1,          // GPIO00 Button
     GPI8_USER,          // GPIO01 TX Serial RXD
-    GPI8_REL1_INV,          // GPIO02 D4 Wemos DHT Shield
+    GPI8_USER,          // GPIO02 D4 Wemos DHT Shield
     GPI8_USER,          // GPIO03 RX Serial TXD and Optional sensor
     GPI8_USER,          // GPIO04 D2 Wemos I2C SDA
     GPI8_USER,          // GPIO05 D1 Wemos I2C SCL / Wemos Relay Shield (0 = Off, 1 = On) / Wemos WS2812B RGB led Shield
@@ -2354,9 +2354,9 @@ const mytmplt8285 kModules8285[TMP_MAXMODULE_8266 - TMP_WEMOS] PROGMEM = {
     GPI8_USER,          // GPIO09 (SD_DATA2 Flash QIO or ESP8285)
     GPI8_USER,          // GPIO10 (SD_DATA3 Flash QIO or ESP8285)
                         // GPIO11 (SD_CMD   Flash)
-    GPI8_USER,          // GPIO12 D6
-    GPI8_USER,          // GPIO13 D7
-    GPI8_USER,          // GPIO14 D5
+    GPI8_REL1,          // GPIO12 Red Led and Relay (0 = Off, 1 = On)
+    GPI8_LED1_INV,      // GPIO13 Green Led (0 = On, 1 = Off) - Link and Power status
+    GPI8_USER,          // GPIO14 Optional sensor
     GPI8_USER,          // GPIO15 D8
     GPI8_USER,          // GPIO16 D0 Wemos Wake
     GPI8_USER           // ADC0 A0 Analog input
