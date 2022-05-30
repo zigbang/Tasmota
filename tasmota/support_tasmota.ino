@@ -884,7 +884,9 @@ void PerformEverySecond(void)
   TasmotaGlobal.uptime++;
 
   if (POWER_CYCLE_TIME == TasmotaGlobal.uptime) {
+#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
     UpdateQuickPowerCycle(false);
+#endif
   }
 
   if (BOOT_LOOP_TIME == TasmotaGlobal.uptime) {
