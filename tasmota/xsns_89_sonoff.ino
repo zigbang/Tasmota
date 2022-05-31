@@ -1,55 +1,50 @@
-// /*
-//     xsns_89_sonoff.ino - ESP8266 based relay for ZIoT Tasmota
-// */
+/*
+    xsns_89_sonoff.ino - ESP8266 based relay for ZIoT Tasmota
+*/
 
-// #ifdef FIRMWARE_ZIOT_SONOFF
-// #define XSNS_89 89
+#ifdef FIRMWARE_ZIOT_SONOFF
+#define XSNS_89 89
 
-// #include <Arduino.h> //
-// #include "tasmota.h" //
+struct ZIoTSonoff {
+    bool ready = false;
+    bool executedOnce = false;
+} ziotSonoff;
 
-// #ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
-// bool initial_ota_try;
-// #endif
+void UpdateShadow(char *payload)
+{
+    char topic[64];
+    char awsPayload[60];
 
-// /*********************************************************************************************\
-// * Interface
-// \*********************************************************************************************/
+    snprintf_P(topic, sizeof(topic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
+    snprintf_P(awsPayload, sizeof(awsPayload), PSTR("{\"state\":{\"reported\":%s}}"), payload);
 
-// bool Xsns89(uint8_t function)
-// {
-//     bool result = false;
+    MqttClient.publish(topic, awsPayload, false);
+}
 
-//     if (FUNC_PRE_INIT == function)
-//     {
-//         // Init
-//     }
-//     else if ()
-//     {
-//         switch (function)
-//         {
-//             case FUNC_LOOP:
-//                 break;
-//             case FUNC_EVERY_SECOND:
-//                 break;
-// #ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
-//             case FUNC_EVERY_250_MSECOND:
-//                 if (!initial_ota_try) {
-//                     char command[TOPSZ + 10];
-//                     snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
-//                     ExecuteCommand(command, SRC_IGNORE);
-//                     initial_ota_try = true;
-//                 }
+/*********************************************************************************************\
+* Interface
+\*********************************************************************************************/
 
-//                 int ota_error = ESPhttpUpdate.getLastError();
+bool Xsns89(uint8_t function)
+{
+    bool result = false;
 
-//                 printf("ota_error : %d\n", ota_error);
-//                 break;
-// #endif
-//         }
-//     }
+    if (FUNC_PRE_INIT == function)
+    {
+        ziotSonoff.ready = true;
+    }
+    else if (ziotSonoff.ready)
+    {
+        switch (function)
+        {
+            case FUNC_LOOP:
+                break;
+            case FUNC_EVERY_SECOND:
+                break;
+        }
+    }
 
-//     return result;
-// }
+    return result;
+}
 
-// #endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT_SONOFF
