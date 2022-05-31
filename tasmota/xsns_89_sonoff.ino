@@ -42,6 +42,15 @@ bool Xsns89(uint8_t function)
             case FUNC_LOOP:
                 break;
             case FUNC_EVERY_SECOND:
+#ifndef FIRMWARE_ZIOT_MINIMAL
+                if (!ziotSonoff.executedOnce && !TasmotaGlobal.global_state.mqtt_down) {
+                    char payload[60];
+                    ziotSonoff.executedOnce = true;
+
+                    snprintf_P(payload, sizeof(payload), PSTR("{\"version\":\"%s\"}"), ziotSonoff.version);
+                    UpdateShadow(payload);
+                }
+#endif
                 break;
         }
     }
