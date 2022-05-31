@@ -893,7 +893,7 @@
 #endif  // ifndef FIRMWARE_MINICUSTOM
 
 #ifdef FIRMWARE_ZIOT_SONOFF
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifndef FIRMWARE_ZIOT_MINIMAL
 #undef CODE_IMAGE_STR
 #define CODE_IMAGE_STR "lite"
 
@@ -1161,7 +1161,7 @@
 #undef USE_THERMOSTAT                            // Disable support for Thermostat
 #undef DEBUG_THEO                                // Disable debug code
 #undef USE_DEBUG_DRIVER                          // Disable debug code
-#endif  // FIRMWARE_ZIOT_SONOFF_MINIMAL
+#endif  // FIRMWARE_ZIOT_MINIMAL
 #endif  // FIRMWARE_ZIOT_SONOFF
 
 

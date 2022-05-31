@@ -1,4 +1,4 @@
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifndef FIRMWARE_ZIOT_MINIMAL
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
@@ -45,11 +45,14 @@ void GetCertification(void) {
     } else {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 성공"), host);
 
-        client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+        String payload = "GET "+ url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
                     "User-Agent: Zigbang\r\n" +
                     "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
-                    "Connection: close\r\n\r\n");
+                    "Connection: close\r\n\r\n";
+
+        client.write(payload.c_str());
+        payload.~String();
 
         String headers = "";
         String body = "";
@@ -65,7 +68,7 @@ void GetCertification(void) {
                 return;
             }
         }
-    
+
         while (client.available()) {
             char c = client.read();
 
@@ -89,7 +92,7 @@ void GetCertification(void) {
             gotResponse = true;
         }
         if (gotResponse) {
-            if (headers.startsWith(PSTR("HTTP/1.1 200"))) {
+            if (headers.startsWith("HTTP/1.1 200")) {
                 AddLog(LOG_LEVEL_INFO, PSTR("요청 성공"));
                 // printf_P(PSTR("body : %s"), (char*) body.c_str());
 #ifdef ESP32
@@ -157,4 +160,4 @@ void ProvisioningCheck(void) {
         GetCertification();
     }
 }
-#endif  // FIRMWARE_ZIOT_SONOFF_MINIMAL
+#endif  // FIRMWARE_ZIOT_MINIMAL

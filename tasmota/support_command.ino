@@ -2283,7 +2283,7 @@ void CmndSSIDReset(void)
 
 void CmndUpdateCert(void)
 {
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifndef FIRMWARE_ZIOT_MINIMAL
   if (XdrvMailbox.data_len > 0) {
     JsonParser parser((char*) XdrvMailbox.data);
     JsonParserObject stateObject = parser.getRootObject();
@@ -2315,7 +2315,7 @@ void CmndUpdateCert(void)
   } else {
     Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
   }
-#endif
+#endif  // FIRMWARE_ZIOT_MINIMAL
 }
 
 void CmndReadInput(void)

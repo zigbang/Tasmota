@@ -210,9 +210,9 @@ struct {
 #else   // Not ESP8266
   char log_buffer[LOG_BUFFER_SIZE];         // Log buffer in DRAM
 #endif  // ESP8266
-#ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifdef FIRMWARE_ZIOT_MINIMAL
   bool initial_ota_try;
-#endif
+#endif  // FIRMWARE_ZIOT_MINIMAL
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
@@ -235,10 +235,6 @@ void setup(void) {
   DisableBrownout();      // Workaround possible weak LDO resulting in brownout detection during Wifi connection
 #endif
 #endif
-
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println("hi!!!");
 
   RtcPreInit();
   SettingsInit();
@@ -272,8 +268,8 @@ void setup(void) {
     uint32_t baudrate = (RtcSettings.baudrate / 300) * 300;  // Make it a valid baudrate
     if (baudrate) { TasmotaGlobal.baudrate = baudrate; }
   }
-  // Serial.begin(TasmotaGlobal.baudrate);
-  // Serial.println();
+  Serial.begin(TasmotaGlobal.baudrate);
+  Serial.println();
 //  Serial.setRxBufferSize(INPUT_BUFFER_SIZE);  // Default is 256 chars
   TasmotaGlobal.seriallog_level = LOG_LEVEL_INFO;  // Allow specific serial messages until config loaded
 
@@ -326,11 +322,6 @@ void setup(void) {
   sprintf_P(tmp, PSTR("http://%s%s"), EC2_HOST, LAMBDA_OTA_URL);
 #endif
   SettingsUpdateText(SET_OTAURL, tmp);
-
-  // SettingsUpdateText(SET_STASSID1, "U+Net8F50");
-  // SettingsUpdateText(SET_STAPWD1, "D2B662A0P@");
-
-  printf("version : 2.0.0\n");
 
   SettingsDelta();
 
@@ -455,9 +446,9 @@ void setup(void) {
 #endif
 #endif  // USE_ARDUINO_OTA
 
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifndef FIRMWARE_ZIOT_MINIMAL
   HTTPSClientInit();
-#endif
+#endif  // FIRMWARE_ZIOT_MINIMAL
 
   XdrvCall(FUNC_INIT);
   XsnsCall(FUNC_INIT);

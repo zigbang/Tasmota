@@ -8,6 +8,7 @@
 struct ZIoTSonoff {
     bool ready = false;
     bool executedOnce = false;
+    char* version = "1.0.0";
 } ziotSonoff;
 
 void UpdateShadow(char *payload)
@@ -32,6 +33,7 @@ bool Xsns89(uint8_t function)
     if (FUNC_PRE_INIT == function)
     {
         ziotSonoff.ready = true;
+        printf("The version of this firmware is : %s\n", ziotSonoff.version);
     }
     else if (ziotSonoff.ready)
     {

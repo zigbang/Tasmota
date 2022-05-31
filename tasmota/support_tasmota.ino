@@ -884,9 +884,7 @@ void PerformEverySecond(void)
   TasmotaGlobal.uptime++;
 
   if (POWER_CYCLE_TIME == TasmotaGlobal.uptime) {
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
     UpdateQuickPowerCycle(false);
-#endif
   }
 
   if (BOOT_LOOP_TIME == TasmotaGlobal.uptime) {
@@ -1211,9 +1209,9 @@ void Every250mSeconds(void)
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpsUpdate.getLastErrorString().c_str());
 #elif ESP8266
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdate.getLastErrorString().c_str());
-#ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifdef FIRMWARE_ZIOT_MINIMAL
           TasmotaGlobal.initial_ota_try = false;
-#endif
+#endif  // FIRMWARE_ZIOT_MINIMAL
 #endif
         }
         ResponseAppend_P(PSTR("\"}"));
@@ -1375,22 +1373,21 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
-#ifndef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#ifndef FIRMWARE_ZIOT_MINIMAL
       if (TasmotaGlobal.idToken_info_flag) {
         // 프로비저닝 모드
         ProvisioningCheck();
       } else {
         MqttCheck();
       }
-#endif
-#ifdef FIRMWARE_ZIOT_SONOFF_MINIMAL
+#else
       if (!TasmotaGlobal.initial_ota_try) {
         char command[TOPSZ + 10];
         snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
         ExecuteCommand(command, SRC_IGNORE);
         TasmotaGlobal.initial_ota_try = true;
       }
-#endif
+#endif  // FIRMWARE_ZIOT_MINIMAL
     } else {
       if (TasmotaGlobal.ota_init_flag) {
 #ifdef ESP32
