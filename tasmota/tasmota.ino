@@ -33,8 +33,12 @@
 #include "tasmota_template.h"               // Hardware configuration
 
 // Libraries
+#ifdef ESP32
 #include <ESP8266HTTPClient.h>              // Ota
 #include <ESP8266httpUpdate.h>              // Ota
+#else
+#include <HTTPWrapper.h>
+#endif
 #include <StreamString.h>                   // Webserver, Updater
 #include <ext_printf.h>
 #include <SBuffer.hpp>

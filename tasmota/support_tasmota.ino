@@ -1099,7 +1099,7 @@ void Every250mSeconds(void)
 #ifdef ESP32
         ESPhttpsUpdate.rebootOnUpdate(false);
 #elif ESP8266
-        ESPhttpUpdate.rebootOnUpdate(false);
+        ESPhttpUpdateWrapped.rebootOnUpdate(false);
 #endif
         SettingsSave(1);                                  // Free flash for OTA update
       }
@@ -1178,14 +1178,14 @@ void Every250mSeconds(void)
 #ifdef ESP32
           ota_result = (HTTP_UPDATE_FAILED != ESPhttpsUpdate.update(*OTAclient, full_ota_url, version, rootCA1));
 #elif ESP8266
-          ota_result = (HTTP_UPDATE_FAILED != ESPhttpUpdate.update(OTAclient, full_ota_url, version));
+          ota_result = (HTTP_UPDATE_FAILED != ESPhttpUpdateWrapped.update(OTAclient, full_ota_url, version));
 #endif
           if (!ota_result) {
 #ifndef FIRMWARE_MINIMAL
 #ifdef ESP32
             int ota_error = ESPhttpsUpdate.getLastError();
 #elif ESP8266
-            int ota_error = ESPhttpUpdate.getLastError();
+            int ota_error = ESPhttpUpdateWrapped.getLastError();
 #endif
             DEBUG_CORE_LOG(PSTR("OTA: Error %d"), ota_error);
 #ifdef ESP8266
@@ -1208,7 +1208,7 @@ void Every250mSeconds(void)
 #ifdef ESP32
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpsUpdate.getLastErrorString().c_str());
 #elif ESP8266
-          ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdate.getLastErrorString().c_str());
+          ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdateWrapped.getLastErrorString().c_str());
 #ifdef FIRMWARE_ZIOT_MINIMAL
           TasmotaGlobal.initial_ota_try = false;
 #endif  // FIRMWARE_ZIOT_MINIMAL
