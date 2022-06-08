@@ -1397,7 +1397,7 @@ void HandleConfigurationWithAppForHTTP(void) {
 
   if(!Webserver->hasArg(F("plain"))) {
     WSContentBegin(500, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Failed\" \"resason\":\"1\" \"data\":\"Server received empty request message\"}"));
+    WSContentSend_P(PSTR("{\"message\":\"Failed\", \"data\":\"Server received empty request message\"}"));
     WSContentEnd();
     return;
   }
@@ -1415,7 +1415,7 @@ void HandleConfigurationWithAppForHTTP(void) {
 
   if (!save_result || !ssid.length() || !pwd.length()) {
     WSContentBegin(400, CT_APP_JSON);
-    WSContentSend_P(PSTR("{\"message\":\"Failed\" \"resason\":\"2\" \"data\":\"Check token, ssid, and pwd\"}"));
+    WSContentSend_P(PSTR("{\"message\":\"Failed\", \"data\":\"Check token, ssid, and pwd again\"}"));
     WSContentEnd();
     return;
   } else {
@@ -1424,10 +1424,8 @@ void HandleConfigurationWithAppForHTTP(void) {
     SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
   }
 
-  printf("token is : %s\n", SettingsText(SET_ID_TOKEN));
-
   WSContentBegin(200, CT_APP_JSON);
-  WSContentSend_P(PSTR("{\"message\":\"Success\", \"deviceId\":\"%s\"}"), SettingsText(SET_MQTT_CLIENT));
+  WSContentSend_P(PSTR("{\"message\":\"Success\", \"data\":\"%s\"}"), SettingsText(SET_MQTT_CLIENT));
 
   WSContentEnd();
 
