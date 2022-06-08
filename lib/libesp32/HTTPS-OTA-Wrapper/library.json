@@ -1,6 +1,6 @@
 {
     "name": "HTTPS-OTA-Wrapper",
-    "keywords": "esp32, esp8266, https, ota",
+    "keywords": "esp32, https, ota",
     "description": "OTA feature based https",
     "version": "1.0.0",
     "frameworks": "arduino",
