@@ -8,7 +8,7 @@
 struct ZIoTSonoff {
     bool ready = false;
     bool executedOnce = false;
-    char* version = "1.0.0";
+    char* version = "1.0.2";
 } ziotSonoff;
 
 void UpdateShadow(char *payload)
@@ -20,6 +20,20 @@ void UpdateShadow(char *payload)
     snprintf_P(awsPayload, sizeof(awsPayload), PSTR("{\"state\":{\"reported\":%s}}"), payload);
 
     MqttClient.publish(topic, awsPayload, false);
+}
+
+void SonoffButtonHandler(void)
+{
+    uint32_t buttonIndex = XdrvMailbox.index;
+    uint16_t loopsPerSec = 1000 / Settings->button_debounce;
+
+    if (Button.last_state[buttonIndex] == PRESSED)
+    {
+        if ((Button.hold_timer[buttonIndex] == loopsPerSec * Settings->param[P_HOLD_TIME] / 10))
+        {
+            TasmotaGlobal.restart_flag = 212;
+        }
+    }
 }
 
 /*********************************************************************************************\
@@ -51,6 +65,9 @@ bool Xsns89(uint8_t function)
                     UpdateShadow(payload);
                 }
 #endif
+                break;
+            case FUNC_BUTTON_PRESSED:
+                SonoffButtonHandler();
                 break;
         }
     }
