@@ -1134,9 +1134,12 @@ void MqttReconnect(void) {
 
 void MqttCheck(void) {
 #ifdef USE_MQTT_TLS
-  if ((nullptr == AWS_IoT_Private_Key) || (nullptr == AWS_IoT_Client_Certificate)) return;
+  if ((nullptr == AWS_IoT_Private_Key) || (nullptr == AWS_IoT_Client_Certificate)) {
+    printf("There is no cert!\n");
+    return;
+  }
 #endif
-  
+
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     if (!MqttIsConnected()) {
       TasmotaGlobal.global_state.mqtt_down = 1;
@@ -1531,14 +1534,14 @@ void CmndStateRetain(void) {
 static uint8_t * tls_spi_start = nullptr;
 const static size_t   tls_spi_len      = 0x0400;  // 1kb blocs
 const static size_t   tls_block_offset = 0x0000;  // don't need offset in FS
-#else
+#else  // Not ESP32
 // const static uint16_t tls_spi_start_sector = EEPROM_LOCATION + 4;  // 0xXXFF
 // const static uint8_t* tls_spi_start    = (uint8_t*) ((tls_spi_start_sector * SPI_FLASH_SEC_SIZE) + 0x40200000);  // 0x40XFF000
 const static uint16_t tls_spi_start_sector = 0xFF;  // Force last bank of first MB
 const static uint8_t* tls_spi_start    = (uint8_t*) 0x402FF000;  // 0x402FF000
 const static size_t   tls_spi_len      = 0x1000;  // 4kb blocs
 const static size_t   tls_block_offset = 0x0400;
-#endif
+#endif  // ESP32
 const static size_t   tls_block_len    = 0x0400;   // 1kb
 const static size_t   tls_obj_store_offset = tls_block_offset + sizeof(tls_dir_t);
 
@@ -1617,7 +1620,6 @@ void loadTlsDir(void) {
   } else {
     AWS_IoT_Client_Certificate = nullptr;
   }
-//Serial.printf("AWS_IoT_Private_Key = %x, AWS_IoT_Client_Certificate = %x\n", AWS_IoT_Private_Key, AWS_IoT_Client_Certificate);
 }
 
 const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate buffer.";
