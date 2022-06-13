@@ -2283,6 +2283,8 @@ void CmndSSIDReset(void)
 
 void CmndUpdateCert(void)
 {
+  bool result = false;
+
 #ifndef FIRMWARE_ZIOT_MINIMAL
   if (XdrvMailbox.data_len > 0) {
     JsonParser parser((char*) XdrvMailbox.data);
@@ -2291,30 +2293,31 @@ void CmndUpdateCert(void)
     String cert = stateObject["cert"].getStr();
     String key = stateObject["key"].getStr();
 
-    if (!cert.length() || !key.length()) {
-      Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
-      return;
+    if (cert.length() && key.length()) {
+      TasmotaGlobal.cert_info_flag = 0;
+      char* certCharType = (char*)cert.c_str();
+      char* keyCharType = (char*)key.c_str();
+      
+      memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+      memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+
+      cert.~String();
+      key.~String();
+
+      if (ConvertTlsFile(0) && ConvertTlsFile(1)) {
+        result = true;
+      }
     }
-
-    TasmotaGlobal.cert_info_flag = 0;
-    char* certCharType = (char*)cert.c_str();
-    char* keyCharType = (char*)key.c_str();
-    
-    memcpy(AmazonClientCert, certCharType, strlen(certCharType));
-    memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
-    printf("cert: %s\n", certCharType);
-    printf("key: %s\n", keyCharType);
-
-    cert.~String();
-    key.~String();
-
-    ConvertTlsFile(0);
-    ConvertTlsFile(1);
-    TasmotaGlobal.cert_info_flag = 1;
-    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
-  } else {
-    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
   }
+
+  if (!result) {
+    printf("cert update failed!\n");
+    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+  } else {
+    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
+    TasmotaGlobal.restart_flag = 2;
+  }
+
 #endif  // FIRMWARE_ZIOT_MINIMAL
 }
 
