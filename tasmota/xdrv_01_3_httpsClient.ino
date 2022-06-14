@@ -37,8 +37,17 @@ char* trimRight(char* s) {
 }
 
 void GetCertification(void) {
-    const char host[] = API_HOST;
-    String url = LAMBDA_CERT_URL + String(SettingsText(SET_MQTT_TOPIC));
+    char* host = (char*)malloc(sizeof(char) * 100);
+    String url;
+
+    if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
+        strcpy(host, API_HOST_DEV);
+        url = LAMBDA_CERT_URL_DEV  + String(SettingsText(SET_MQTT_TOPIC)) + "&pnu=" + SettingsText(SET_PNU) + "&dongho=" + SettingsText(SET_DONGHO);
+    }
+    else {
+        strcpy(host, API_HOST_PROD);
+        url = LAMBDA_CERT_URL_PROD  + String(SettingsText(SET_MQTT_TOPIC)) + "&pnu=" + SettingsText(SET_PNU) + "&dongho=" + SettingsText(SET_DONGHO);
+    }
 
     if ((nullptr == AWS_IoT_Private_Key) || !client.connect(host, 443)) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
@@ -51,6 +60,7 @@ void GetCertification(void) {
                     "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
                     "Connection: close\r\n\r\n";
 
+        free(host);
         client.write(payload.c_str());
         payload.~String();
 

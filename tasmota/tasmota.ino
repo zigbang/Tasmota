@@ -320,12 +320,13 @@ void setup(void) {
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
   }
-#ifdef ESP32
-  sprintf_P(tmp, PSTR("https://%s%s"), API_HOST, LAMBDA_OTA_URL);
-#elif ESP8266
-  sprintf_P(tmp, PSTR("http://%s%s"), EC2_HOST, LAMBDA_OTA_URL);
-#endif
-  SettingsUpdateText(SET_OTAURL, tmp);
+
+  if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
+    SettingsUpdateText(SET_OTAURL, OTA_URL_DEV);
+  }
+  else {
+    SettingsUpdateText(SET_OTAURL, OTA_URL_PROD);
+  }
 
   SettingsDelta();
 

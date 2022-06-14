@@ -1405,12 +1405,15 @@ void HandleConfigurationWithAppForHTTP(void) {
   JsonParser parser((char*) Webserver->arg("plain").c_str());
   JsonParserObject stateObject = parser.getRootObject();
 
-  String idToken = stateObject["idToken"].getStr();
-  String ssid = stateObject["ssid1"].getStr();
-  String pwd = stateObject["pwd1"].getStr();
+  String authToken = stateObject["authToken"].getStr();
+  String ssid = stateObject["ssid"].getStr();
+  String pwd = stateObject["pwd"].getStr();
+  String pnu = stateObject["pnu"].getStr();
+  String dongho = stateObject["dongho"].getStr();
+  String env = stateObject["env"].getStr();
 
-  if (idToken.length()) {
-    save_result = SaveAccessToken((char*)idToken.c_str());
+  if (authToken.length()) {
+    save_result = SaveAccessToken((char*)authToken.c_str());
   }
 
   if (!save_result || !ssid.length() || !pwd.length()) {
@@ -1422,6 +1425,9 @@ void HandleConfigurationWithAppForHTTP(void) {
     SettingsUpdateText(SET_ID_TOKEN, "TRUE");
     SettingsUpdateText(SET_STASSID1, (char*)ssid.c_str());
     SettingsUpdateText(SET_STAPWD1, (char*)pwd.c_str());
+    SettingsUpdateText(SET_PNU, (char*)pnu.c_str());
+    SettingsUpdateText(SET_DONGHO, (char*)dongho.c_str());
+    SettingsUpdateText(SET_ENV, (char*)env.c_str());
   }
 
   WSContentBegin(200, CT_APP_JSON);
