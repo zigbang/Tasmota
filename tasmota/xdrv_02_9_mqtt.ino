@@ -891,9 +891,11 @@ void MqttConnected(void) {
     }
 
     XdrvCall(FUNC_MQTT_SUBSCRIBE);
+    XsnsCall(FUNC_MQTT_SUBSCRIBE);
   }
 
   if (Mqtt.initial_connection_state) {
+#ifndef FIRMWARE_ZIOT_SONOFF
     if (ResetReason() != REASON_DEEP_SLEEP_AWAKE) {
       char stopic2[TOPSZ];
       Response_P(PSTR("{\"Info1\":{\"" D_CMND_MODULE "\":\"%s\",\"" D_JSON_VERSION "\":\"%s%s\",\"" D_JSON_FALLBACKTOPIC "\":\"%s\",\"" D_CMND_GROUPTOPIC "\":\"%s\"}}"),
@@ -922,11 +924,13 @@ void MqttConnected(void) {
     }
 
     MqttPublishAllPowerState();
+#endif  // FIRMWARE_ZIOT_SONOFF
     if (Settings->tele_period) {
       TasmotaGlobal.tele_period = Settings->tele_period -5;  // Enable TelePeriod in 5 seconds
     }
     TasmotaGlobal.rules_flag.system_boot = 1;
     XdrvCall(FUNC_MQTT_INIT);
+    XsnsCall(FUNC_MQTT_INIT);
   }
   Mqtt.initial_connection_state = 0;
 
