@@ -42,23 +42,28 @@ void GetCertification(void) {
 
     if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
         strcpy(host, API_HOST_DEV);
-        url = LAMBDA_CERT_URL_DEV  + String(SettingsText(SET_MQTT_TOPIC)) + "&pnu=" + SettingsText(SET_PNU) + "&dongho=" + SettingsText(SET_DONGHO);
+        url = LAMBDA_CERT_URL_DEV;
     }
     else {
         strcpy(host, API_HOST_PROD);
-        url = LAMBDA_CERT_URL_PROD  + String(SettingsText(SET_MQTT_TOPIC)) + "&pnu=" + SettingsText(SET_PNU) + "&dongho=" + SettingsText(SET_DONGHO);
+        url = LAMBDA_CERT_URL_PROD;
     }
 
     if ((nullptr == AWS_IoT_Private_Key) || !client.connect(host, 443)) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
     } else {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 성공"), host);
+        String msg = String("{\"pnu\":\"") + SettingsText(SET_PNU) + "\", \"dongho\":\"" + SettingsText(SET_DONGHO) + "\", \"thingName\":\"" + SettingsText(SET_MQTT_TOPIC) + "\"}";
 
-        String payload = "GET "+ url + " HTTP/1.1\r\n" +
+        String payload = "POST "+ url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
                     "User-Agent: Zigbang\r\n" +
                     "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
-                    "Connection: close\r\n\r\n";
+                    "Connection: close\r\n" +
+                    "Content-Type: application/json\r\n" +
+                    "Content-Length: " + msg.length() + "\r\n" +
+                    "\r\n" +
+                    msg + "\r\n";
 
         free(host);
         client.write(payload.c_str());
@@ -81,6 +86,7 @@ void GetCertification(void) {
 
         while (client.available()) {
             char c = client.read();
+            printf("%c", c);
 
             if (finishedHeaders) {
                 body = body + c;
