@@ -121,7 +121,8 @@ void GetCertification(void) {
 
                 String cert = stateObject["cert"].getStr();
                 String key = stateObject["key"].getStr();
-                if (!cert.length() || !key.length()) {
+                String arn = stateObject["arn"].getStr();
+                if (!cert.length() || !key.length() || !arn.length()) {
                     AddLog(LOG_LEVEL_INFO, PSTR("Cert 정보 Error"));
                     client.stop();
                     return;
@@ -129,9 +130,12 @@ void GetCertification(void) {
 
                 char* certCharType = (char*)cert.c_str();
                 char* keyCharType = (char*)key.c_str();
+                char* arnCharType = (char*)arn.c_str();
 
                 memcpy(AmazonClientCert, certCharType, strlen(certCharType));
                 memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+
+                SettingsUpdateText(SET_CERT_ARN, arnCharType);
 
                 url.~String();
                 headers.~String();
