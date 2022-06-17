@@ -784,6 +784,7 @@ void MqttPublishPowerState(uint32_t device) {
 
   if ((device < 1) || (device > TasmotaGlobal.devices_present)) { device = 1; }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   if (IsModuleIfan() && (device > 1)) {
     if (GetFanspeed() < MaxFanspeed()) {  // 4 occurs when fanspeed is 3 and RC button 2 is pressed
@@ -800,13 +801,25 @@ void MqttPublishPowerState(uint32_t device) {
     GetPowerDevice(scommand, device, sizeof(scommand), Settings->flag.device_index_enable);           // SetOption26 - Switch between POWER or POWER1
     GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, (Settings->flag.mqtt_response) ? scommand : S_RSLT_RESULT);  // SetOption4 - Switch between MQTT RESULT or COMMAND
     Response_P(S_JSON_COMMAND_SVALUE, scommand, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
+#else  // FIRMWARE_ZIOT_SONOFF
+    snprintf_P(stopic, sizeof(stopic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
+
+    if (bitRead(TasmotaGlobal.power, device -1) == 0) {
+      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "false", "false");
+    }
+    else {
+      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "true", "true");
+    }
+#endif  // #ifndef FIRMWARE_ZIOT_SONOFF
     MqttPublish(stopic);
 
+#ifndef FIRMWARE_ZIOT_SONOFF
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, scommand);
       Response_P(GetStateText(bitRead(TasmotaGlobal.power, device -1)));
       MqttPublish(stopic, Settings->flag.mqtt_power_retain);  // CMND_POWERRETAIN
     }
+#endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   }
 #endif  // USE_SONOFF_IFAN
@@ -865,9 +878,11 @@ void MqttConnected(void) {
     Mqtt.retry_counter_delay = 1;
     Mqtt.connect_count++;
 
+#ifndef FIRMWARE_ZIOT_SONOFF
     GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
     Response_P(PSTR(MQTT_LWT_ONLINE));
     MqttPublish(stopic, true);
+#endif  // FIRMWARE_ZIOT_SONOFF
 
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       // Satisfy iobroker (#299)
@@ -999,8 +1014,13 @@ void MqttReconnect(void) {
     mqtt_pwd = SettingsText(SET_MQTT_PWD);
   }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
   GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
   Response_P(S_LWT_OFFLINE);
+#else
+  snprintf_P(stopic, sizeof(stopic), PSTR("ziot/sonoff/%s/%s/will"), "basicr2", SettingsText(SET_MQTT_TOPIC));
+  Response_P("{\"state\":{\"reported\":{\"status\":{\"isConnected\":false}}}}");
+#endif  // FIRMWARE_ZIOT_SONOFF
 
   if (MqttClient.connected()) { MqttClient.disconnect(); }
   EspClient.setTimeout(Settings->mqtt_wifi_timeout * 100);

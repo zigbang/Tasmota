@@ -254,7 +254,9 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
     grpflg, type, index, data_len, (binary_data) ? HexToString((uint8_t*)dataBuf, data_len).c_str() : dataBuf);
 
   if (type != nullptr) {
+#ifndef FIRMWARE_ZIOT_SONOFF
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_ERROR "\"}"));
+#endif  // FIRMWARE_ZIOT_SONOFF
 
     if (Settings->ledstate &0x02) { TasmotaGlobal.blinks++; }
 
@@ -307,12 +309,14 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
 
   }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
   if (type == nullptr) {
     TasmotaGlobal.blinks = 201;
     snprintf_P(stemp1, sizeof(stemp1), PSTR(D_JSON_COMMAND));
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_UNKNOWN "\"}"));
     type = (char*)stemp1;
   }
+#endif  // FIRMWARE_ZIOT_SONOFF
 
   if (ResponseLength()) {
     MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, type);

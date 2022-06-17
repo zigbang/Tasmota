@@ -795,6 +795,11 @@ const char S_JSON_DRIVER_INDEX_SVALUE[] PROGMEM =             "{\"" D_CMND_DRIVE
 
 const char S_JSON_SVALUE_ACTION_SVALUE[] PROGMEM =            "{\"%s\":{\"Action\":\"%s\"}}";
 
+#ifdef FIRMWARE_ZIOT_SONOFF
+const char S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED[] PROGMEM = "{\"state\":{\"desired\":{\"status\":{\"switch1\":%s}},\"reported\":{\"status\":{\"switch1\":%s}}}}";
+const char S_JSON_SONOFF_SWITCH_SHADOW[] PROGMEM = "{\"state\":{\"reported\":{\"status\":{\"switch1\":%s}}}}";
+#endif  // FIRMWARE_ZIOT_SONOFF
+
 const char JSON_SNS_F_TEMP[] PROGMEM = ",\"%s\":{\"" D_JSON_TEMPERATURE "\":%*_f}";
 const char JSON_SNS_TEMP[] PROGMEM = ",\"%s\":{\"" D_JSON_TEMPERATURE "\":%s}";
 

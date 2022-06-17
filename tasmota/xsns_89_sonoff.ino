@@ -9,6 +9,8 @@ struct ZIoTSonoff {
     bool ready = false;
     bool executedOnce = false;
     bool isInitialStage = true;
+    bool waitShadowResponse = false;
+    uint32_t sessionId = 0;
     char* version = "1.0.2";
     char mainTopic[60];
     char shadowTopic[70];
@@ -58,6 +60,7 @@ void UpdateShadow(char *payload)
     snprintf_P(topic, sizeof(topic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
     snprintf_P(awsPayload, sizeof(awsPayload), PSTR("{\"state\":{\"reported\":%s}}"), payload);
 
+    ziotSonoff.waitShadowResponse = true;
     MqttClient.publish(topic, awsPayload, false);
 }
 
@@ -72,6 +75,8 @@ void SonoffButtonHandler(void)
         {
             TasmotaGlobal.restart_flag = 212;
         }
+        
+        ziotSonoff.waitShadowResponse = true;
     }
 }
 
@@ -100,14 +105,21 @@ bool Xsns89(uint8_t function)
                         SettingsText(SET_MQTT_TOPIC));
             break;
             case FUNC_MQTT_INIT:
-                char payload[200];
+            {
+                char payload[500] = "";
+                char responseTopic[73] = "";
+                char errorTopic[73] = "";
+
+                snprintf_P(responseTopic, sizeof(responseTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/hello/accepted");
+                snprintf_P(errorTopic, sizeof(errorTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/hello/rejected");
 
                 snprintf_P(payload, sizeof(payload), \
-                    PSTR("{\"vendor\":\"sonoff\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"firmwareVersion\":\"%s\"}"), \
-                    SettingsText(SET_MQTT_TOPIC), SettingsText(SET_PNU), SettingsText(SET_DONGHO), ziotSonoff.version);
+                    PSTR("{\"sessionId\":\"%d\",\"responseTopic\":\"%s\",\"errorTopic\":\"%s\",\"vendor\":\"sonoff\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"certArn\":\"%s\",\"firmwareVersion\":\"%s\"}"), \
+                    ++ziotSonoff.sessionId, responseTopic, errorTopic, SettingsText(SET_MQTT_TOPIC), SettingsText(SET_PNU), SettingsText(SET_DONGHO), SettingsText(SET_CERT_ARN), ziotSonoff.version);
 
                 PublishMainTopicWithPostfix(payload, "/hello");
                 break;
+            }
             case FUNC_MQTT_SUBSCRIBE:
                 SubscribeMainTopicWithPostfix("/hello/accepted");
                 SubscribeMainTopicWithPostfix("/hello/rejected");
@@ -115,6 +127,7 @@ bool Xsns89(uint8_t function)
             case FUNC_COMMAND:
                 if (ziotSonoff.isInitialStage) {
                     if (strcmp(XdrvMailbox.topic, "ACCEPT") == 0) {
+                        strcpy(XdrvMailbox.topic, "");
                         ziotSonoff.isInitialStage = false;
                         
                         SubscribeShadowTopicWithPostfix("/delta");
@@ -137,7 +150,41 @@ bool Xsns89(uint8_t function)
                     }
                 }
                 else {
+                    if (ziotSonoff.waitShadowResponse) {
+                        if (strcmp(XdrvMailbox.topic, "REJECTED") == 0) {
+                            printf("something is rejected!!!\n");
+                            strcpy(XdrvMailbox.topic, "");
+                            ziotSonoff.waitShadowResponse = true;
+                            MqttPublish(ziotSonoff.shadowTopic);
+                        }
+                        else {
+                            ziotSonoff.waitShadowResponse = false;
+                        }
+                    }
+                    else {
+                        if (strcmp(XdrvMailbox.topic, "DELTA") == 0) {
+                            strcpy(XdrvMailbox.topic, "");
+                            bool executeCommand = false;
 
+                            JsonParser parser(XdrvMailbox.data);
+                            JsonParserObject root = parser.getRootObject();
+                            JsonParserObject state = root["state"].getObject();
+                            JsonParserObject status = state["status"].getObject();
+                            String switch1 = status["switch1"].getStr();
+                            char* switch1CharType = (char*)switch1.c_str();
+
+                            if ((strcmp(switch1CharType, "true") == 0) && bitRead(TasmotaGlobal.power, 0) == 0) {
+                                SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
+                                Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "true");
+                                MqttPublish(ziotSonoff.shadowTopic);
+                            }
+                            else if ((strcmp(switch1CharType, "false") == 0) && bitRead(TasmotaGlobal.power, 0) == 1) {
+                                SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
+                                Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "false");
+                                MqttPublish(ziotSonoff.shadowTopic);
+                            }
+                        }
+                    }
                 }
                 break;
 #endif  // FIRMWARE_ZIOT_MINIMAL
