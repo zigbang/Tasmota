@@ -5,6 +5,8 @@
 #ifdef FIRMWARE_ZIOT_SONOFF
 #define XSNS_89 89
 
+#define HEALTH_CHECK_PERIOD 300
+
 struct ZIoTSonoff {
     bool ready = false;
     bool executedOnce = false;
@@ -17,6 +19,7 @@ struct ZIoTSonoff {
     char* schemeVersion = "v220110";
     char* vendor = "sonoff";
     char* thingType = "relay";
+    uint32_t second = 0;
 } ziotSonoff;
 
 void PublishMainTopicWithPostfix(char *payload, char *postfix)
@@ -176,13 +179,18 @@ bool Xsns89(uint8_t function)
                             if ((strcmp(switch1CharType, "true") == 0) && bitRead(TasmotaGlobal.power, 0) == 0) {
                                 SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
                                 Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "true");
+                                ziotSonoff.waitShadowResponse = true;
                                 MqttPublish(ziotSonoff.shadowTopic);
                             }
                             else if ((strcmp(switch1CharType, "false") == 0) && bitRead(TasmotaGlobal.power, 0) == 1) {
                                 SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
                                 Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "false");
+                                ziotSonoff.waitShadowResponse = true;
                                 MqttPublish(ziotSonoff.shadowTopic);
                             }
+                        }
+                        else if (strcmp(XdrvMailbox.topic, "RES") == 0) {
+                            printf("health check response is received!!!\n");
                         }
                     }
                 }
@@ -192,12 +200,30 @@ bool Xsns89(uint8_t function)
                 break;
             case FUNC_EVERY_SECOND:
 #ifndef FIRMWARE_ZIOT_MINIMAL
+                ziotSonoff.second++;
+
                 if (!ziotSonoff.executedOnce && !TasmotaGlobal.global_state.mqtt_down) {
                     char payload[60];
                     ziotSonoff.executedOnce = true;
 
                     snprintf_P(payload, sizeof(payload), PSTR("{\"version\":\"%s\"}"), ziotSonoff.version);
                     UpdateShadow(payload);
+                }
+
+                if (ziotSonoff.second == HEALTH_CHECK_PERIOD) {
+                    char payload[500] = "";
+                    char requestTopic[80] = "";
+                    char responseTopic[80] = "";
+
+                    snprintf_P(requestTopic, sizeof(requestTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/healthcheck");
+                    snprintf_P(responseTopic, sizeof(responseTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/healthcheck/res");
+
+                    snprintf_P(payload, sizeof(payload), \
+                    PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s\",\"data\":\"%s\"}"), \
+                    SettingsText(SET_MQTT_TOPIC), ++ziotSonoff.sessionId, requestTopic, responseTopic, "");
+
+                    PublishMainTopicWithPostfix(payload, "/healthcheck");
+                    ziotSonoff.second = 0;
                 }
 #endif  // FIRMWARE_ZIOT_MINIMAL
                 break;
