@@ -801,17 +801,8 @@ void MqttPublishPowerState(uint32_t device) {
     GetPowerDevice(scommand, device, sizeof(scommand), Settings->flag.device_index_enable);           // SetOption26 - Switch between POWER or POWER1
     GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, (Settings->flag.mqtt_response) ? scommand : S_RSLT_RESULT);  // SetOption4 - Switch between MQTT RESULT or COMMAND
     Response_P(S_JSON_COMMAND_SVALUE, scommand, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
-#else  // FIRMWARE_ZIOT_SONOFF
-    snprintf_P(stopic, sizeof(stopic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
-
-    if (bitRead(TasmotaGlobal.power, device -1) == 0) {
-      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "false", "false");
-    }
-    else {
-      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "true", "true");
-    }
-#endif  // #ifndef FIRMWARE_ZIOT_SONOFF
     MqttPublish(stopic);
+#endif  // #ifndef FIRMWARE_ZIOT_SONOFF
 
 #ifndef FIRMWARE_ZIOT_SONOFF
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
