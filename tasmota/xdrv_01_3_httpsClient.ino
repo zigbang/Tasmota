@@ -53,17 +53,12 @@ void GetCertification(void) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
     } else {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 성공"), host);
-        String msg = String("{\"pnu\":\"") + SettingsText(SET_PNU) + "\", \"dongho\":\"" + SettingsText(SET_DONGHO) + "\", \"thingName\":\"" + SettingsText(SET_MQTT_TOPIC) + "\"}";
 
-        String payload = "POST "+ url + " HTTP/1.1\r\n" +
+        String payload = "GET "+ url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
                     "User-Agent: Zigbang\r\n" +
                     "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
-                    "Connection: close\r\n" +
-                    "Content-Type: application/json\r\n" +
-                    "Content-Length: " + msg.length() + "\r\n" +
-                    "\r\n" +
-                    msg + "\r\n";
+                    "Connection: close\r\n\r\n";
 
         free(host);
         client.write(payload.c_str());
@@ -110,7 +105,6 @@ void GetCertification(void) {
         if (gotResponse) {
             if (headers.startsWith("HTTP/1.1 200")) {
                 AddLog(LOG_LEVEL_INFO, PSTR("요청 성공"));
-                // printf_P(PSTR("body : %s"), (char*) body.c_str());
 #ifdef ESP32
                 char* temp = trimRight((char*) body.c_str());
                 JsonParser parser(temp);
