@@ -6,7 +6,7 @@
 #define XSNS_89 89
 
 #define HEALTH_CHECK_PERIOD 120
-#define RESPONSE_TIMEOUT_US 5000000 // 5s
+#define RESPONSE_TIMEOUT_US 10000000 // 5s
 #define MAX_RETRY_COUNT 5
 
 #define HELLO_RESPONSE_CHECKER 0
@@ -182,10 +182,17 @@ void SubscribeShadowTopicWithPostfix(char *postfix)
 void UpdateInitialShadow(void)
 {
     char payload[410];
+    char switch1[6];
+
+    if (bitRead(TasmotaGlobal.power, 0) == 0) {
+        strcpy(switch1, "false");
+    } else {
+        strcpy(switch1, "true");
+    }
 
     snprintf_P(payload, sizeof(payload), \
         PSTR("{\"schemeVersion\":\"%s\",\"vendor\":\"%s\",\"thingType\":\"%s\",\"firmwareVersion\":\"%s\",\"status\":{\"isConnected\":true,\"batteryPercentage\":100,\"switch1\":%s,\"countdown1\":0,\"relayStatus\":\"2\",\"cycleTime\":\"\",\"switchInching\":\"\"}}"), \
-        ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, "true" \
+        ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, switch1 \
     );
 
     ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
