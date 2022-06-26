@@ -258,15 +258,6 @@ void SonoffButtonHandler(void)
         {
             TasmotaGlobal.restart_flag = 212;
         }
-
-#ifndef FIRMWARE_ZIOT_MINIMAL
-        if (bitRead(TasmotaGlobal.power, 0) == 0) {
-            UpdateShadowWithDesired(SWITCH_ON);
-        }
-        else {
-            UpdateShadowWithDesired(SWITCH_OFF);
-        }
-#endif  // FIRMWARE_ZIOT_MINIMAL
     }
 }
 

@@ -810,6 +810,17 @@ void MqttPublishPowerState(uint32_t device) {
       Response_P(GetStateText(bitRead(TasmotaGlobal.power, device -1)));
       MqttPublish(stopic, Settings->flag.mqtt_power_retain);  // CMND_POWERRETAIN
     }
+#else  // FIRMWARE_ZIOT_SONOFF
+    snprintf_P(stopic, sizeof(stopic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
+
+    if (bitRead(TasmotaGlobal.power, 0) == 0) {
+      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "false", "false");
+    }
+    else {
+      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "true", "true");
+    }
+
+    MqttPublish(stopic);
 #endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   }
