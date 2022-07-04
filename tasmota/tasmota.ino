@@ -217,6 +217,9 @@ struct {
 #ifdef FIRMWARE_ZIOT_MINIMAL
   bool initial_ota_try;
 #endif  // FIRMWARE_ZIOT_MINIMAL
+#ifdef FIRMWARE_ZIOT_SONOFF
+  char sonoff_ota_url[100];
+#endif
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
@@ -324,9 +327,11 @@ void setup(void) {
 
   if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
     SettingsUpdateText(SET_OTAURL, OTA_URL_DEV);
+    strcpy(TasmotaGlobal.sonoff_ota_url, OTA_URL_DEV);
   }
   else {
     SettingsUpdateText(SET_OTAURL, OTA_URL_PROD);
+    strcpy(TasmotaGlobal.sonoff_ota_url, OTA_URL_PROD);
   }
 
   SettingsDelta();

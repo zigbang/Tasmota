@@ -749,6 +749,12 @@ void CmndUpgrade(void)
   // Check if the version we have been asked to upgrade to is higher than our current version.
   //   We also need at least 3 chars to make a valid version number string.
   if (((1 == XdrvMailbox.data_len) && (1 == XdrvMailbox.payload)) || ((XdrvMailbox.data_len >= 3) && NewerVersion(XdrvMailbox.data))) {
+#ifdef FIRMWARE_ZIOT_SONOFF
+    strcpy(TasmotaGlobal.sonoff_ota_url, SettingsText(SET_OTAURL));
+#ifndef FIRMWARE_ZIOT_MINIMAL
+    SaveTargetOtaUrl("http://13.209.165.165/ota");
+#endif  // FIRMWARE_ZIOT_MINIMAL
+#endif  // FIRMWARE_ZIOT_SONOFF
     TasmotaGlobal.ota_state_flag = 3;
     char stemp1[TOPSZ];
     Response_P(PSTR("{\"%s\":\"" D_JSON_VERSION " %s " D_JSON_FROM " %s\"}"), XdrvMailbox.command, TasmotaGlobal.version, GetOtaUrl(stemp1, sizeof(stemp1)));

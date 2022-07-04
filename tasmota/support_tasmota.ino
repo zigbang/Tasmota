@@ -1122,7 +1122,11 @@ void Every250mSeconds(void)
         ota_retry_counter--;
         if (ota_retry_counter) {
           char ota_url[TOPSZ];
+#ifndef FIRMWARE_ZIOT_SONOFF
           strlcpy(full_ota_url, GetOtaUrl(ota_url, sizeof(ota_url)), sizeof(full_ota_url));
+#else
+          strlcpy(full_ota_url, TasmotaGlobal.sonoff_ota_url, sizeof(full_ota_url));
+#endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef ESP8266
 #ifndef FIRMWARE_MINIMAL
           if (RtcSettings.ota_loader) {
@@ -1382,9 +1386,10 @@ void Every250mSeconds(void)
       }
 #else
       if (!TasmotaGlobal.initial_ota_try) {
-        char command[TOPSZ + 10];
-        snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
-        ExecuteCommand(command, SRC_IGNORE);
+        // char command[TOPSZ + 10];
+        // snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
+        // ExecuteCommand(command, SRC_IGNORE);
+        TasmotaGlobal.ota_state_flag = 3;
         TasmotaGlobal.initial_ota_try = true;
       }
 #endif  // FIRMWARE_ZIOT_MINIMAL
