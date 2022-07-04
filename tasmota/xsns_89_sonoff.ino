@@ -5,12 +5,12 @@
 #ifdef FIRMWARE_ZIOT_SONOFF
 #define XSNS_89 89
 
-#define HEALTH_CHECK_PERIOD 120
+#define HEALTH_CHECK_PERIOD 80
 #define RESPONSE_TIMEOUT_US 10000000 // 5s
 #define MAX_RETRY_COUNT 5
 
 #define HELLO_RESPONSE_CHECKER 0
-#define HEALTHCHECK_RESPONSE_CHECKER 1
+#define CHITCHAT_RESPONSE_CHECKER 1
 #define SHADOW_RESPONSE_CHECKER 2
 #define MAX_RESPONSE_CHECKER 3
 
@@ -30,26 +30,61 @@ struct TimeoutChecker {
     uint8_t count = 0;
     bool ready = false;
 };
+
+struct WiFiConfig {
+    char* ssid;
+    char* bssid;
+    char* ipAddr;
+    char* gatewayAddr;
+};
 #endif  // FIRMWARE_ZIOT_MINIMAL
 
 struct ZIoTSonoff {
     bool ready = false;
-    bool executedOnce = false;
     uint32_t sessionId = 0;
-    char* version = "1.0.2";
+    char* version = "1.0.3";
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
     char shadowTopic[70];
-    char* schemeVersion = "v220110";
+    char* schemeVersion = "v220530";
     char* vendor = "sonoff";
     char* thingType = "relay";
     uint32_t second = 0;
     int8_t lastShadow = NO_SHADOW;
     TimeoutChecker timeoutChecker[3];
+    WiFiConfig wifiConfig;
 #endif  // FIRMWARE_ZIOT_MINIMAL
 } ziotSonoff;
 
 #ifndef FIRMWARE_ZIOT_MINIMAL
+int numberOfSetBits(uint32_t i)
+{
+     uint32_t temp = i;
+     temp = temp - ((temp >> 1) & 0x55555555);        // add pairs of bits
+     temp = (temp & 0x33333333) + ((temp >> 2) & 0x33333333);  // quads
+     temp = (temp + (temp >> 4)) & 0x0F0F0F0F;        // groups of 8
+     return (temp * 0x01010101) >> 24;          // horizontal sum of bytes
+}
+
+void MakeStatusesLastFormat(uint8_t numberOfArray, char** codeArray, char** valueArray, char* output)
+{
+    for (uint8_t i = 0; i < numberOfArray; i++)
+    {
+        int size = strlen(codeArray[i]) + strlen(valueArray[i] + 13);
+        char* temp = (char*)malloc(size + 60);
+        char timestamp[15] = "";
+        GetTimestampInMillis(timestamp);
+        if (i == numberOfArray - 1) {
+            snprintf_P(temp, size + 60, "{\"code\":\"%s\",\"value\":%s,\"createdAt\":%s}", codeArray[i], valueArray[i], timestamp);
+        }
+        else {
+            snprintf_P(temp, size + 60, "{\"code\":\"%s\",\"value\":%s,\"createdAt\":%s},", codeArray[i], valueArray[i], timestamp);
+        }
+        strcat(output, temp);
+        free(temp);
+    }
+}
+
 uint32_t GetUsTime(void)
 {
     uint32_t usTime = 0;
@@ -92,8 +127,8 @@ void CheckTimerList(void)
                         case HELLO_RESPONSE_CHECKER:
                             PublishHello();
                             break;
-                        case HEALTHCHECK_RESPONSE_CHECKER:
-                            PublishHealthCheck();
+                        case CHITCHAT_RESPONSE_CHECKER:
+                            PublishChitChat();
                             break;
                         case SHADOW_RESPONSE_CHECKER:
                             break;
@@ -108,16 +143,14 @@ void CheckTimerList(void)
 
 void PublishHello(void)
 {
-    char payload[500] = "";
-    char responseTopic[73] = "";
-    char errorTopic[73] = "";
+    char payload[530] = "";
+    char requestTopic[73] = "";
 
-    snprintf_P(responseTopic, sizeof(responseTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/hello/accepted");
-    snprintf_P(errorTopic, sizeof(errorTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/hello/rejected");
+    snprintf_P(requestTopic, sizeof(requestTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/hello");
 
     snprintf_P(payload, sizeof(payload), \
-        PSTR("{\"sessionId\":\"%d\",\"responseTopic\":\"%s\",\"errorTopic\":\"%s\",\"vendor\":\"sonoff\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"certArn\":\"%s\",\"firmwareVersion\":\"%s\"}"), \
-        ++ziotSonoff.sessionId, responseTopic, errorTopic, SettingsText(SET_MQTT_TOPIC), SettingsText(SET_PNU), SettingsText(SET_DONGHO), SettingsText(SET_CERT_ARN), ziotSonoff.version);
+        PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s/accepted\",\"errorTopic\":\"%s/rejected\",\"data\":{\"vendor\":\"sonoff\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"certArn\":\"%s\",\"firmwareVersion\":\"%s\"}}"), \
+        SettingsText(SET_MQTT_TOPIC), ++ziotSonoff.sessionId, requestTopic, requestTopic, requestTopic, SettingsText(SET_MQTT_TOPIC), SettingsText(SET_PNU), SettingsText(SET_DONGHO), SettingsText(SET_CERT_ARN), ziotSonoff.version);
     
     ziotSonoff.timeoutChecker[HELLO_RESPONSE_CHECKER].startTime = GetUsTime();
     ziotSonoff.timeoutChecker[HELLO_RESPONSE_CHECKER].ready = true;
@@ -125,23 +158,20 @@ void PublishHello(void)
     PublishMainTopicWithPostfix(payload, "/hello");
 }
 
-void PublishHealthCheck(void)
+void PublishChitChat(void)
 {
-    char payload[500] = "";
+    char payload[600] = "";
     char requestTopic[80] = "";
-    char responseTopic[80] = "";
 
-    snprintf_P(requestTopic, sizeof(requestTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/healthcheck");
-    snprintf_P(responseTopic, sizeof(responseTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/healthcheck/res");
-
+    snprintf_P(requestTopic, sizeof(requestTopic), PSTR("%s%s"), ziotSonoff.mainTopic, "/chitchat");    
     snprintf_P(payload, sizeof(payload), \
-        PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s\",\"data\":\"%s\"}"), \
-        SettingsText(SET_MQTT_TOPIC), ++ziotSonoff.sessionId, requestTopic, responseTopic, "");
+        PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s/res\",\"data\":{\"network\":{\"ap\":{\"ssid\":\"%s\",\"bssid\":\"%s\"},\"ip\":{\"address\":\"%s/%d\",\"gateway\":\"%s\"},\"misc\":{\"rssi\":\"%d\"}}}}"), \
+        SettingsText(SET_MQTT_TOPIC), ++ziotSonoff.sessionId, requestTopic, requestTopic, ziotSonoff.wifiConfig.ssid, ziotSonoff.wifiConfig.bssid, ziotSonoff.wifiConfig.ipAddr, numberOfSetBits((uint32_t)WiFi.subnetMask()), ziotSonoff.wifiConfig.gatewayAddr, WiFi.RSSI());
 
-    ziotSonoff.timeoutChecker[HEALTHCHECK_RESPONSE_CHECKER].startTime = GetUsTime();
-    ziotSonoff.timeoutChecker[HEALTHCHECK_RESPONSE_CHECKER].ready = true;
+    ziotSonoff.timeoutChecker[CHITCHAT_RESPONSE_CHECKER].startTime = GetUsTime();
+    ziotSonoff.timeoutChecker[CHITCHAT_RESPONSE_CHECKER].ready = true;
 
-    PublishMainTopicWithPostfix(payload, "/healthcheck");
+    PublishMainTopicWithPostfix(payload, "/chitchat");
 
     ziotSonoff.second = 0;
 }
@@ -155,6 +185,7 @@ void PublishMainTopicWithPostfix(char *payload, char *postfix)
     strcat(topic, postfix);
 
     MqttPublishPayload(topic, payload);
+    free(topic);
 }
 
 void SubscribeMainTopicWithPostfix(char *postfix)
@@ -166,6 +197,7 @@ void SubscribeMainTopicWithPostfix(char *postfix)
     strcat(topic, postfix);
 
     MqttSubscribe(topic);
+    free(topic);
 }
 
 void SubscribeShadowTopicWithPostfix(char *postfix)
@@ -177,12 +209,14 @@ void SubscribeShadowTopicWithPostfix(char *postfix)
     strcat(topic, postfix);
 
     MqttSubscribe(topic);
+    free(topic);
 }
 
 void UpdateInitialShadow(void)
 {
     char payload[410];
     char switch1[6];
+    char statusesLast[80] = "";
 
     if (bitRead(TasmotaGlobal.power, 0) == 0) {
         strcpy(switch1, "false");
@@ -190,62 +224,130 @@ void UpdateInitialShadow(void)
         strcpy(switch1, "true");
     }
 
-    snprintf_P(payload, sizeof(payload), \
-        PSTR("{\"schemeVersion\":\"%s\",\"vendor\":\"%s\",\"thingType\":\"%s\",\"firmwareVersion\":\"%s\",\"status\":{\"isConnected\":true,\"batteryPercentage\":100,\"switch1\":%s,\"countdown1\":0,\"relayStatus\":\"2\",\"cycleTime\":\"\",\"switchInching\":\"\"}}"), \
-        ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, switch1 \
-    );
+    char* code[1] = {"switch1"};
+    char* value[1] = {switch1};
+    MakeStatusesLastFormat(1, code, value, statusesLast);
+
 
     ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
     ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
     ziotSonoff.lastShadow = INITIAL_SHADOW;
 
-    UpdateShadow(payload);
+    UpdateShadow(ziotSonoff.shadowTopic, (char*)S_JSON_SONOFF_SWITCH_SHADOW, ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, switch1, statusesLast);
 }
 
 void UpdateShadowWithDesired(bool switchValue)
 {
+    char statusesLast[80] = "";
+    char* code[1] = {"switch1"};
+    char* value[1] = {""};
+
     if (switchValue == SWITCH_OFF) {
-        Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "false", "false");
+        strcpy(value[0], "false");
+        MakeStatusesLastFormat(1, code, value, statusesLast);
+
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
         ziotSonoff.lastShadow = SWITICH_OFF_SHADOW_WITH_DESIRED;
     } else {
-        Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "true", "true");
+        strcpy(value[0], "true");
+        MakeStatusesLastFormat(1, code, value, statusesLast);
+
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
         ziotSonoff.lastShadow = SWITICH_ON_SHADOW_WITH_DESIRED;
     }
-
-    MqttPublish(ziotSonoff.shadowTopic);
+    UpdateShadow(ziotSonoff.shadowTopic, (char*)S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, value[0], ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, value[0], statusesLast);
 }
 
 void UpdateShadowOnlyReported(bool switchValue)
 {
+    char statusesLast[80] = "";
+    char* code[1] = {"switch1"};
+    char* value[1] = {""};
+
     if (switchValue == SWITCH_OFF) {
-        Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "false");
+        strcpy(value[0], "false");
+        MakeStatusesLastFormat(1, code, value, statusesLast);
+        
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
         ziotSonoff.lastShadow = SWITICH_OFF_SHADOW_ONLY_REPORTED;
     } else {
-        Response_P(S_JSON_SONOFF_SWITCH_SHADOW, "true");
+        strcpy(value[0], "true");
+        MakeStatusesLastFormat(1, code, value, statusesLast);
+
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
         ziotSonoff.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
         ziotSonoff.lastShadow = SWITICH_ON_SHADOW_ONLY_REPORTED;
     }
-    MqttPublish(ziotSonoff.shadowTopic);
+    UpdateShadow(ziotSonoff.shadowTopic, (char*)S_JSON_SONOFF_SWITCH_SHADOW, ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.version, value[0], statusesLast);
 }
 
-void UpdateShadow(char *payload)
+void UpdateShadow(char *topic, char *format, ...)
 {
-    char topic[64];
-    char awsPayload[410];
+    va_list ap;
+    va_start(ap, format);
 
-    snprintf_P(topic, sizeof(topic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
-    snprintf_P(awsPayload, sizeof(awsPayload), PSTR("{\"state\":{\"reported\":%s}}"), payload);
+    ResponseWithVaList(format, ap);
 
-    MqttClient.publish(topic, awsPayload, false);
+    va_end(ap);
+    MqttPublish(topic);
+}
+
+bool SaveTargetOtaUrl(char* url)
+{
+    uint8_t *spi_buffer = (uint8_t*)malloc(tls_spi_len);
+    if (!spi_buffer) {
+        printf("Can't allocate memory to spi_buffer!\n");
+        return false;
+    }
+
+    memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
+    uint16_t startAddress = atoi(SettingsText(SET_ENTRY2_START));
+    memcpy(spi_buffer + tls_obj_store_offset + startAddress, url, strlen(url) + 1);
+    if (ESP.flashEraseSector(tls_spi_start_sector)) {
+        ESP.flashWrite(tls_spi_start_sector * SPI_FLASH_SEC_SIZE, (uint32_t*)spi_buffer, SPI_FLASH_SEC_SIZE);
+    }
+    free(spi_buffer);
+}
+
+void InitWifiConfig(void)
+{
+    ziotSonoff.wifiConfig.ssid = (char*)malloc(30);
+    strcpy(ziotSonoff.wifiConfig.ssid, SettingsText(SET_STASSID1));
+
+    ziotSonoff.wifiConfig.bssid = (char*)malloc(WiFi.BSSIDstr().length());
+    strcpy(ziotSonoff.wifiConfig.bssid, WiFi.BSSIDstr().c_str());
+
+    uint32_t temp2 = (uint32_t)NetworkAddress();
+    ziotSonoff.wifiConfig.ipAddr = (char*)malloc(16);
+    snprintf_P(ziotSonoff.wifiConfig.ipAddr, 16, PSTR("%u.%u.%u.%u"), temp2 & 0xFF, (temp2 >> 8) & 0xFF, (temp2 >> 16) & 0xFF, (temp2 >> 24) & 0xFF);
+
+    temp2 = Settings->ipv4_address[1];
+    ziotSonoff.wifiConfig.gatewayAddr = (char*)malloc(16);
+    snprintf_P(ziotSonoff.wifiConfig.gatewayAddr, 16, PSTR("%u.%u.%u.%u"), temp2 & 0xFF, (temp2 >> 8) & 0xFF, (temp2 >> 16) & 0xFF, (temp2 >> 24) & 0xFF);
+}
+
+void GetTimestampInMillis(char* src)
+{
+    String timestamp = String(UtcTime()) + String(RtcMillis());
+    strcpy(src, timestamp.c_str());
 }
 #endif  // FIRMWARE_ZIOT_MINIMAL
+
+bool LoadTargetOtaUrl(void)
+{
+    tls_dir_t tls_dir_2;
+    uint16_t startAddress;
+    if (strcmp(SettingsText(SET_ENTRY2_START), "") != 0) {
+        startAddress = atoi(SettingsText(SET_ENTRY2_START));
+
+        memcpy_P(&tls_dir_2, (uint8_t*)0x402FF000 + 0x0400, sizeof(tls_dir_2));
+        char* data = (char *) (tls_spi_start + tls_obj_store_offset + startAddress);
+        strcpy(TasmotaGlobal.sonoff_ota_url, data);
+    }
+}
 
 void SonoffButtonHandler(void)
 {
@@ -273,6 +375,9 @@ bool Xsns89(uint8_t function)
     {
         ziotSonoff.ready = true;
         printf("The version of this firmware is : %s\n", ziotSonoff.version);
+#ifdef FIRMWARE_ZIOT_MINIMAL
+        LoadTargetOtaUrl();
+#endif  // FIRMWARE_ZIOT_MINIMAL
     }
     else if (ziotSonoff.ready)
     {
@@ -287,6 +392,7 @@ bool Xsns89(uint8_t function)
             break;
             case FUNC_MQTT_INIT:
             {
+                InitWifiConfig();
                 PublishHello();
                 break;
             }
@@ -305,7 +411,7 @@ bool Xsns89(uint8_t function)
                         SubscribeShadowTopicWithPostfix("/delta");
                         SubscribeShadowTopicWithPostfix("/rejected");
                         SubscribeShadowTopicWithPostfix("/accepted");
-                        SubscribeMainTopicWithPostfix("/healthcheck/res");
+                        SubscribeMainTopicWithPostfix("/chitchat/res");
 
                         UpdateInitialShadow();
                     }
@@ -379,17 +485,28 @@ bool Xsns89(uint8_t function)
                             String sessionId = root["sessionId"].getStr();
 
                             JsonParserObject data = root["data"].getObject();
-                            String version = data["version"].getStr();
+                            JsonParserObject ota = data["ota"].getObject();
+                            String newVersion = ota["newVersion"].getStr();
+                            String targetUrl = ota["targetUrl"].getStr();
+                            String minimalUrl = ota["minimalUrl"].getStr();
 
-                            if (sessionId.length() && version.length()) {
+                            if (sessionId.length()) {
                                 char* sessionIdCharType = (char*)sessionId.c_str();
                                 
                                 if (atoi(sessionIdCharType) == ziotSonoff.sessionId) {
-                                    ziotSonoff.timeoutChecker[HEALTHCHECK_RESPONSE_CHECKER].ready = false;
-                                    ziotSonoff.timeoutChecker[HEALTHCHECK_RESPONSE_CHECKER].count = 0;
+                                    ziotSonoff.timeoutChecker[CHITCHAT_RESPONSE_CHECKER].ready = false;
+                                    ziotSonoff.timeoutChecker[CHITCHAT_RESPONSE_CHECKER].count = 0;
 
-                                    char* versionCharType = (char*)version.c_str();
-                                    TasmotaGlobal.ota_state_flag = 3;
+                                    char* newVersionCharType = (char*)newVersion.c_str();
+                                    char* minimalUrlCharType = (char*)minimalUrl.c_str();
+                                    char* targetUrlCharType = (char*)targetUrl.c_str();
+
+                                    if ((targetUrl.length() && minimalUrl.length()) && ((strcmp(minimalUrlCharType, "false") != 0) && (strcmp(targetUrlCharType, "false") != 0))) {
+                                        SaveTargetOtaUrl(targetUrlCharType);
+                                        strcpy(TasmotaGlobal.sonoff_ota_url, minimalUrlCharType);
+
+                                        TasmotaGlobal.ota_state_flag = 3;
+                                    }
                                 }
                             }
                         }
@@ -403,16 +520,8 @@ bool Xsns89(uint8_t function)
 #ifndef FIRMWARE_ZIOT_MINIMAL
                 ziotSonoff.second++;
 
-                if (!ziotSonoff.executedOnce && !TasmotaGlobal.global_state.mqtt_down) {
-                    char payload[60];
-                    ziotSonoff.executedOnce = true;
-
-                    snprintf_P(payload, sizeof(payload), PSTR("{\"version\":\"%s\"}"), ziotSonoff.version);
-                    UpdateShadow(payload);
-                }
-
                 if (!TasmotaGlobal.global_state.mqtt_down && ziotSonoff.second == HEALTH_CHECK_PERIOD) {
-                    // PublishHealthCheck();
+                    PublishChitChat();
                 }
 
                 CheckTimerList();

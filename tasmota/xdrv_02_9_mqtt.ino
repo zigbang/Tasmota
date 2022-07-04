@@ -23,6 +23,23 @@
 
 // #define DEBUG_DUMP_TLS    // allow dumping of TLS Flash keys
 
+class tls_entry_t {
+public:
+  uint32_t name;    // simple 4 letters name. Currently 'skey', 'crt ', 'crt1', 'crt2'
+  uint16_t start;   // start offset
+  uint16_t len;     // len of object
+};                  // 8 bytes
+
+const static uint32_t TLS_NAME_SKEY = 0x2079656B; // 'key ' little endian
+const static uint32_t TLS_NAME_CRT  = 0x20747263; // 'crt ' little endian
+
+class tls_dir_t {
+public:
+  tls_entry_t entry[4];     // 4 entries max, only 4 used today, for future use
+};                          // 4*8 = 64 bytes
+
+tls_dir_t tls_dir;          // memory copy of tls_dir from flash
+
 #ifdef USE_MQTT_TLS
   #include "WiFiClientSecureLightBearSSL.h"
   BearSSL::WiFiClientSecure_light *tlsClient;
@@ -115,23 +132,6 @@ struct MQTT {
 
 const br_ec_private_key *AWS_IoT_Private_Key = nullptr;
 const br_x509_certificate *AWS_IoT_Client_Certificate = nullptr;
-
-class tls_entry_t {
-public:
-  uint32_t name;    // simple 4 letters name. Currently 'skey', 'crt ', 'crt1', 'crt2'
-  uint16_t start;   // start offset
-  uint16_t len;     // len of object
-};                  // 8 bytes
-
-const static uint32_t TLS_NAME_SKEY = 0x2079656B; // 'key ' little endian
-const static uint32_t TLS_NAME_CRT  = 0x20747263; // 'crt ' little endian
-
-class tls_dir_t {
-public:
-  tls_entry_t entry[4];     // 4 entries max, only 4 used today, for future use
-};                          // 4*8 = 64 bytes
-
-tls_dir_t tls_dir;          // memory copy of tls_dir from flash
 
 #endif  // USE_MQTT_AWS_IOT
 
@@ -811,16 +811,14 @@ void MqttPublishPowerState(uint32_t device) {
       MqttPublish(stopic, Settings->flag.mqtt_power_retain);  // CMND_POWERRETAIN
     }
 #else  // FIRMWARE_ZIOT_SONOFF
-    snprintf_P(stopic, sizeof(stopic), PSTR("$aws/things/%s/shadow/update"), SettingsText(SET_MQTT_TOPIC));
-
+#ifndef FIRMWARE_ZIOT_MINIMAL
     if (bitRead(TasmotaGlobal.power, 0) == 0) {
-      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "false", "false");
+      UpdateShadowWithDesired(false);
     }
     else {
-      Response_P(S_JSON_SONOFF_SWITCH_SHADOW_WITH_DESIRED, "true", "true");
+      UpdateShadowWithDesired(true);
     }
-
-    MqttPublish(stopic);
+#endif  // FIRMWARE_ZIOT_MINIMAL
 #endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   }
@@ -1554,8 +1552,6 @@ void CmndStateRetain(void) {
 /*********************************************************************************************\
  * TLS private key and certificate - store into Flash
 \*********************************************************************************************/
-#if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
-
 #ifdef ESP32
 static uint8_t * tls_spi_start = nullptr;
 const static size_t   tls_spi_len      = 0x0400;  // 1kb blocs
@@ -1570,6 +1566,8 @@ const static size_t   tls_block_offset = 0x0400;
 #endif  // ESP32
 const static size_t   tls_block_len    = 0x0400;   // 1kb
 const static size_t   tls_obj_store_offset = tls_block_offset + sizeof(tls_dir_t);
+
+#if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
 
 inline void TlsEraseBuffer(uint8_t *buffer) {
   memset(buffer + tls_block_offset, 0xFF, tls_block_len);
@@ -1742,6 +1740,9 @@ bool ConvertTlsFile(uint8_t cert) {
     entry->name = TLS_NAME_CRT;
     entry->start = (tls_dir_write->entry[0].start + tls_dir_write->entry[0].len + 3) & ~0x03; // align to 4 bytes boundary
     entry->len = bin_len;
+    char temp[5];
+    snprintf_P(temp, sizeof(temp), "%d", (tls_dir_write->entry[1].start + tls_dir_write->entry[1].len + 3) & ~0x03);
+    SettingsUpdateText(SET_ENTRY2_START, temp);
     memcpy(spi_buffer + tls_obj_store_offset + entry->start, bin_buf, entry->len);
     save_file = true;
   }

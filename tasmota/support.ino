@@ -1238,6 +1238,33 @@ int Response_P(const char* format, ...)        // Content send snprintf_P char d
 #endif
 }
 
+#ifdef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT_MINIMAL
+int ResponseWithVaList(const char* format, va_list va)
+{
+#ifdef MQTT_DATA_STRING
+  va_list va_cpy;
+  va_copy(va_cpy, va);
+  char* mqtt_data = ext_vsnprintf_malloc_P(format, va_cpy);
+  va_end(va_cpy);
+  if (mqtt_data != nullptr) {
+    TasmotaGlobal.mqtt_data = mqtt_data;
+    free(mqtt_data);
+  } else {
+    TasmotaGlobal.mqtt_data = "";
+  }
+  return TasmotaGlobal.mqtt_data.length();
+#else
+  va_list va_cpy;
+  va_copy(va_cpy, va);
+  int len = ext_vsnprintf_P(TasmotaGlobal.mqtt_data, ResponseSize(), format, va_cpy);
+  va_end(va_cpy);
+  return len;
+#endif  // MQTT_DATA_STRING
+}
+#endif  // FIRMWARE_ZIOT_MINIMAL
+#endif  // FIRMWARE_ZIOT_SONOFF
+
 int ResponseTime_P(const char* format, ...)    // Content send snprintf_P char data
 {
   // This uses char strings. Be aware of sending %% if % is needed
