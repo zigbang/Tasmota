@@ -19,6 +19,7 @@
 #ifdef ESP32
 #include <WiFiClientSecure.h>
 #endif
+#include "tasmota.h"
 
 const char kSleepMode[] PROGMEM = "Dynamic|Normal";
 const char kPrefixes[] PROGMEM = D_CMND "|" D_STAT "|" D_TELE;
@@ -806,7 +807,7 @@ void TempHumDewShow(bool json, bool pass_on, const char *types, float f_temperat
 #endif  // USE_KNX
 #ifdef USE_WEBSERVER
   } else {
-    WSContentSend_THD(types, f_temperature, f_humidity);
+    // WSContentSend_THD(types, f_temperature, f_humidity);
 #endif  // USE_WEBSERVER
   }
 }
@@ -1098,7 +1099,7 @@ void Every250mSeconds(void)
 #ifdef ESP32
         ESPhttpsUpdate.rebootOnUpdate(false);
 #elif ESP8266
-        ESPhttpUpdate.rebootOnUpdate(false);
+        ESPhttpUpdateWrapped.rebootOnUpdate(false);
 #endif
         SettingsSave(1);                                  // Free flash for OTA update
       }
@@ -1121,7 +1122,11 @@ void Every250mSeconds(void)
         ota_retry_counter--;
         if (ota_retry_counter) {
           char ota_url[TOPSZ];
+#ifndef FIRMWARE_ZIOT_SONOFF
           strlcpy(full_ota_url, GetOtaUrl(ota_url, sizeof(ota_url)), sizeof(full_ota_url));
+#else
+          strlcpy(full_ota_url, TasmotaGlobal.sonoff_ota_url, sizeof(full_ota_url));
+#endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef ESP8266
 #ifndef FIRMWARE_MINIMAL
           if (RtcSettings.ota_loader) {
@@ -1177,14 +1182,14 @@ void Every250mSeconds(void)
 #ifdef ESP32
           ota_result = (HTTP_UPDATE_FAILED != ESPhttpsUpdate.update(*OTAclient, full_ota_url, version, rootCA1));
 #elif ESP8266
-          ota_result = (HTTP_UPDATE_FAILED != ESPhttpUpdate.update(OTAclient, full_ota_url, version));
+          ota_result = (HTTP_UPDATE_FAILED != ESPhttpUpdateWrapped.update(OTAclient, full_ota_url, version));
 #endif
           if (!ota_result) {
 #ifndef FIRMWARE_MINIMAL
 #ifdef ESP32
             int ota_error = ESPhttpsUpdate.getLastError();
 #elif ESP8266
-            int ota_error = ESPhttpUpdate.getLastError();
+            int ota_error = ESPhttpUpdateWrapped.getLastError();
 #endif
             DEBUG_CORE_LOG(PSTR("OTA: Error %d"), ota_error);
 #ifdef ESP8266
@@ -1207,7 +1212,10 @@ void Every250mSeconds(void)
 #ifdef ESP32
           ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpsUpdate.getLastErrorString().c_str());
 #elif ESP8266
-          ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdate.getLastErrorString().c_str());
+          ResponseAppend_P(PSTR(D_JSON_FAILED " %s"), ESPhttpUpdateWrapped.getLastErrorString().c_str());
+#ifdef FIRMWARE_ZIOT_MINIMAL
+          TasmotaGlobal.initial_ota_try = false;
+#endif  // FIRMWARE_ZIOT_MINIMAL
 #endif
         }
         ResponseAppend_P(PSTR("\"}"));
@@ -1369,12 +1377,22 @@ void Every250mSeconds(void)
       }
 #endif  // USE_KNX
 
+#ifndef FIRMWARE_ZIOT_MINIMAL
       if (TasmotaGlobal.idToken_info_flag) {
         // 프로비저닝 모드
         ProvisioningCheck();
       } else {
         MqttCheck();
       }
+#else
+      if (!TasmotaGlobal.initial_ota_try) {
+        // char command[TOPSZ + 10];
+        // snprintf_P(command, sizeof(command), PSTR(D_CMND_UPGRADE " 1"));
+        // ExecuteCommand(command, SRC_IGNORE);
+        TasmotaGlobal.ota_state_flag = 3;
+        TasmotaGlobal.initial_ota_try = true;
+      }
+#endif  // FIRMWARE_ZIOT_MINIMAL
     } else {
       if (TasmotaGlobal.ota_init_flag) {
 #ifdef ESP32
@@ -1557,12 +1575,12 @@ void ArduinoOtaLoop(void)
 {
 #ifdef ESP8266
   MDNS.update();
-#endif
+#endif  // ESP8266
   ArduinoOTA.handle();
   // Once OTA is triggered, only handle that and dont do other stuff. (otherwise it fails)
   while (arduino_ota_triggered) { ArduinoOTA.handle(); }
 }
-#endif
+#endif  // ESP8266
 #endif  // USE_ARDUINO_OTA
 
 /********************************************************************************************/

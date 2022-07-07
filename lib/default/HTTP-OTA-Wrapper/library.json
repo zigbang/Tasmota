@@ -1,0 +1,8 @@
+{
+    "name": "HTTP-OTA-Wrapper",
+    "keywords": "esp8266, http, ota",
+    "description": "OTA feature based http. Especially for ziot tasmota",
+    "version": "1.0.0",
+    "frameworks": "arduino",
+    "platforms": "espressif8266"
+}

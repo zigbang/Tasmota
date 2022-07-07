@@ -33,8 +33,12 @@
 #include "tasmota_template.h"               // Hardware configuration
 
 // Libraries
+#ifdef ESP32
 #include <ESP8266HTTPClient.h>              // Ota
 #include <ESP8266httpUpdate.h>              // Ota
+#else
+#include <HTTPWrapper.h>
+#endif
 #include <StreamString.h>                   // Webserver, Updater
 #include <ext_printf.h>
 #include <SBuffer.hpp>
@@ -210,6 +214,12 @@ struct {
 #else   // Not ESP8266
   char log_buffer[LOG_BUFFER_SIZE];         // Log buffer in DRAM
 #endif  // ESP8266
+#ifdef FIRMWARE_ZIOT_MINIMAL
+  bool initial_ota_try;
+#endif  // FIRMWARE_ZIOT_MINIMAL
+#ifdef FIRMWARE_ZIOT_SONOFF
+  char sonoff_ota_url[100];
+#endif
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
@@ -267,7 +277,6 @@ void setup(void) {
   }
   Serial.begin(TasmotaGlobal.baudrate);
   Serial.println();
-  printf("free mem when init : %d\n", ESP.getFreeHeap());
 //  Serial.setRxBufferSize(INPUT_BUFFER_SIZE);  // Default is 256 chars
   TasmotaGlobal.seriallog_level = LOG_LEVEL_INFO;  // Allow specific serial messages until config loaded
 
@@ -296,30 +305,34 @@ void setup(void) {
   UfsInit();  // xdrv_50_filesystem.ino
 #endif
 
-  printf("free mem before settings load : %d\n", ESP.getFreeHeap());
   SettingsLoad();
-  printf("free mem after settings load : %d\n", ESP.getFreeHeap());
 
   // TODO: 모듈화
   char tmp[TOPSZ];
 
   String mac_address = NetworkUniqueId();
   String mac_part = mac_address.substring(6);
+  mac_address.toLowerCase();
 
-  sprintf(tmp, "ZiotThing-%s-%s-%s", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1), mac_address.c_str());
+  sprintf_P(tmp, PSTR("sonoff-%s"), mac_address.c_str());
   SettingsUpdateText(SET_MQTT_CLIENT, tmp);
   SettingsUpdateText(SET_MQTT_TOPIC, tmp);
   strcpy(TasmotaGlobal.mqtt_client, tmp);
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
-  sprintf(tmp, "ZiotThing-%s-%s-group", DEVICE_TYPE, SettingsText(SET_FRIENDLYNAME1));
+  sprintf_P(tmp, PSTR("sonoff-%s-group"), SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
   }
-  sprintf(tmp, "https://%s%s", API_HOST, LAMBDA_OTA_URL);
-  SettingsUpdateText(SET_OTAURL, tmp);
 
-  printf("free mem after string setting : %d\n", ESP.getFreeHeap());
+  if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
+    SettingsUpdateText(SET_OTAURL, OTA_URL_DEV);
+    strcpy(TasmotaGlobal.sonoff_ota_url, OTA_URL_DEV);
+  }
+  else {
+    SettingsUpdateText(SET_OTAURL, OTA_URL_PROD);
+    strcpy(TasmotaGlobal.sonoff_ota_url, OTA_URL_PROD);
+  }
 
   SettingsDelta();
 
@@ -403,7 +416,7 @@ void setup(void) {
   // Thehackbox inserts "release" or "commit number" before compiling using sed -i -e 's/PSTR("(%s)")/PSTR("(85cff52-%s)")/g' tasmota.ino
   snprintf_P(TasmotaGlobal.image_name, sizeof(TasmotaGlobal.image_name), PSTR("(%s)"), PSTR(CODE_IMAGE_STR));  // Results in (85cff52-tasmota) or (release-tasmota)
   SettingsUpdateText(SET_HOSTNAME, SettingsText(SET_FRIENDLYNAME1));
-  if (!strstr(SettingsText(SET_HOSTNAME), "ZIGBANG")) { // TODO: Flash에 저장하는 Flag로 대체
+  if (!strstr_P(SettingsText(SET_HOSTNAME), PSTR("ZIGBANG"))) { // TODO: Flash에 저장하는 Flag로 대체
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, SettingsText(SET_HOSTNAME));
   } else {
     snprintf_P(TasmotaGlobal.hostname, sizeof(TasmotaGlobal.hostname)-1, PSTR("%s_%s"), SettingsText(SET_HOSTNAME), mac_part.c_str());
@@ -412,8 +425,6 @@ void setup(void) {
 
   mac_address.~String();
   mac_part.~String();
-
-  printf("free mem before module initialization : %d\n", ESP.getFreeHeap());
 
   RtcInit();
   GpioInit();
@@ -425,8 +436,6 @@ void setup(void) {
 #ifdef USE_BERRY
   BerryInit();
 #endif // USE_BERRY
-
-printf("free mem after module initialization : %d\n", ESP.getFreeHeap());
 
   XdrvCall(FUNC_PRE_INIT);
   XsnsCall(FUNC_PRE_INIT);
@@ -448,11 +457,9 @@ printf("free mem after module initialization : %d\n", ESP.getFreeHeap());
 #endif
 #endif  // USE_ARDUINO_OTA
 
-printf("free mem after xdrv, xsns call : %d\n", ESP.getFreeHeap());
-
+#ifndef FIRMWARE_ZIOT_MINIMAL
   HTTPSClientInit();
-
-printf("free mem after https client init : %d\n", ESP.getFreeHeap());
+#endif  // FIRMWARE_ZIOT_MINIMAL
 
   XdrvCall(FUNC_INIT);
   XsnsCall(FUNC_INIT);
@@ -461,8 +468,6 @@ printf("free mem after https client init : %d\n", ESP.getFreeHeap());
 #endif
 
   TasmotaGlobal.rules_flag.system_init = 1;
-
-  printf("free mem at the end of setup : %d\n", ESP.getFreeHeap());
 }
 
 void BacklogLoop(void) {
@@ -525,7 +530,7 @@ void Scheduler(void) {
 #ifdef USE_DEVICE_GROUPS
   DeviceGroupsLoop();
 #endif  // USE_DEVICE_GROUPS
-  BacklogLoop();
+  // BacklogLoop();
 
   static uint32_t state_50msecond = 0;             // State 50msecond timer
   if (TimeReached(state_50msecond)) {
@@ -561,7 +566,7 @@ void Scheduler(void) {
     XsnsCall(FUNC_EVERY_SECOND);
   }
 
-  if (!TasmotaGlobal.serial_local) { SerialInput(); }
+  // if (!TasmotaGlobal.serial_local) { SerialInput(); }
 
 #ifdef USE_ARDUINO_OTA
 #ifdef ESP32
@@ -578,8 +583,6 @@ void loop(void) {
   Scheduler();
 
   uint32_t my_activity = millis() - my_sleep;
-
-  // printf("free mem : %d\n", ESP.getFreeHeap());
 
   if (Settings->flag3.sleep_normal) {               // SetOption60 - Enable normal sleep instead of dynamic sleep
     //  yield();                                   // yield == delay(0), delay contains yield, auto yield in loop

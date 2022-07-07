@@ -254,7 +254,9 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
     grpflg, type, index, data_len, (binary_data) ? HexToString((uint8_t*)dataBuf, data_len).c_str() : dataBuf);
 
   if (type != nullptr) {
+#ifndef FIRMWARE_ZIOT_SONOFF
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_ERROR "\"}"));
+#endif  // FIRMWARE_ZIOT_SONOFF
 
     if (Settings->ledstate &0x02) { TasmotaGlobal.blinks++; }
 
@@ -307,12 +309,14 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
 
   }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
   if (type == nullptr) {
     TasmotaGlobal.blinks = 201;
     snprintf_P(stemp1, sizeof(stemp1), PSTR(D_JSON_COMMAND));
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_UNKNOWN "\"}"));
     type = (char*)stemp1;
   }
+#endif  // FIRMWARE_ZIOT_SONOFF
 
   if (ResponseLength()) {
     MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, type);
@@ -745,6 +749,12 @@ void CmndUpgrade(void)
   // Check if the version we have been asked to upgrade to is higher than our current version.
   //   We also need at least 3 chars to make a valid version number string.
   if (((1 == XdrvMailbox.data_len) && (1 == XdrvMailbox.payload)) || ((XdrvMailbox.data_len >= 3) && NewerVersion(XdrvMailbox.data))) {
+#ifdef FIRMWARE_ZIOT_SONOFF
+    strcpy(TasmotaGlobal.sonoff_ota_url, SettingsText(SET_OTAURL));
+#ifndef FIRMWARE_ZIOT_MINIMAL
+    SaveTargetOtaUrl("http://13.209.165.165/ota");
+#endif  // FIRMWARE_ZIOT_MINIMAL
+#endif  // FIRMWARE_ZIOT_SONOFF
     TasmotaGlobal.ota_state_flag = 3;
     char stemp1[TOPSZ];
     Response_P(PSTR("{\"%s\":\"" D_JSON_VERSION " %s " D_JSON_FROM " %s\"}"), XdrvMailbox.command, TasmotaGlobal.version, GetOtaUrl(stemp1, sizeof(stemp1)));
@@ -2283,6 +2293,9 @@ void CmndSSIDReset(void)
 
 void CmndUpdateCert(void)
 {
+  bool result = false;
+
+#ifndef FIRMWARE_ZIOT_MINIMAL
   if (XdrvMailbox.data_len > 0) {
     JsonParser parser((char*) XdrvMailbox.data);
     JsonParserObject stateObject = parser.getRootObject();
@@ -2290,30 +2303,32 @@ void CmndUpdateCert(void)
     String cert = stateObject["cert"].getStr();
     String key = stateObject["key"].getStr();
 
-    if (!cert.length() || !key.length()) {
-      Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
-      return;
+    if (cert.length() && key.length()) {
+      TasmotaGlobal.cert_info_flag = 0;
+      char* certCharType = (char*)cert.c_str();
+      char* keyCharType = (char*)key.c_str();
+      
+      memcpy(AmazonClientCert, certCharType, strlen(certCharType));
+      memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
+
+      cert.~String();
+      key.~String();
+
+      if (ConvertTlsFile(0) && ConvertTlsFile(1)) {
+        result = true;
+      }
     }
-
-    TasmotaGlobal.cert_info_flag = 0;
-    char* certCharType = (char*)cert.c_str();
-    char* keyCharType = (char*)key.c_str();
-    
-    memcpy(AmazonClientCert, certCharType, strlen(certCharType));
-    memcpy(AmazonPrivateKey, keyCharType, strlen(keyCharType));
-    printf("cert: %s\n", certCharType);
-    printf("key: %s\n", keyCharType);
-
-    cert.~String();
-    key.~String();
-
-    ConvertTlsFile(0);
-    ConvertTlsFile(1);
-    TasmotaGlobal.cert_info_flag = 1;
-    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
-  } else {
-    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
   }
+
+  if (!result) {
+    printf("cert update failed!\n");
+    Response_P(PSTR("{\"Cert update\":\"Failed\"}"));
+  } else {
+    Response_P(PSTR("{\"Cert update\":\"Success\"}"));
+    TasmotaGlobal.restart_flag = 2;
+  }
+
+#endif  // FIRMWARE_ZIOT_MINIMAL
 }
 
 void CmndReadInput(void)

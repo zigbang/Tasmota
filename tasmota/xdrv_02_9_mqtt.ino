@@ -23,6 +23,23 @@
 
 // #define DEBUG_DUMP_TLS    // allow dumping of TLS Flash keys
 
+class tls_entry_t {
+public:
+  uint32_t name;    // simple 4 letters name. Currently 'skey', 'crt ', 'crt1', 'crt2'
+  uint16_t start;   // start offset
+  uint16_t len;     // len of object
+};                  // 8 bytes
+
+const static uint32_t TLS_NAME_SKEY = 0x2079656B; // 'key ' little endian
+const static uint32_t TLS_NAME_CRT  = 0x20747263; // 'crt ' little endian
+
+class tls_dir_t {
+public:
+  tls_entry_t entry[4];     // 4 entries max, only 4 used today, for future use
+};                          // 4*8 = 64 bytes
+
+tls_dir_t tls_dir;          // memory copy of tls_dir from flash
+
 #ifdef USE_MQTT_TLS
   #include "WiFiClientSecureLightBearSSL.h"
   BearSSL::WiFiClientSecure_light *tlsClient;
@@ -115,23 +132,6 @@ struct MQTT {
 
 const br_ec_private_key *AWS_IoT_Private_Key = nullptr;
 const br_x509_certificate *AWS_IoT_Client_Certificate = nullptr;
-
-class tls_entry_t {
-public:
-  uint32_t name;    // simple 4 letters name. Currently 'skey', 'crt ', 'crt1', 'crt2'
-  uint16_t start;   // start offset
-  uint16_t len;     // len of object
-};                  // 8 bytes
-
-const static uint32_t TLS_NAME_SKEY = 0x2079656B; // 'key ' little endian
-const static uint32_t TLS_NAME_CRT  = 0x20747263; // 'crt ' little endian
-
-class tls_dir_t {
-public:
-  tls_entry_t entry[4];     // 4 entries max, only 4 used today, for future use
-};                          // 4*8 = 64 bytes
-
-tls_dir_t tls_dir;          // memory copy of tls_dir from flash
 
 #endif  // USE_MQTT_AWS_IOT
 
@@ -226,6 +226,8 @@ void MqttInit(void) {
       TasmotaGlobal.cert_info_flag = 1;
     } else {
       TasmotaGlobal.cert_info_flag = 0;
+      delete tlsClient;
+      return;
     }
 #endif
 
@@ -782,6 +784,7 @@ void MqttPublishPowerState(uint32_t device) {
 
   if ((device < 1) || (device > TasmotaGlobal.devices_present)) { device = 1; }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   if (IsModuleIfan() && (device > 1)) {
     if (GetFanspeed() < MaxFanspeed()) {  // 4 occurs when fanspeed is 3 and RC button 2 is pressed
@@ -799,12 +802,24 @@ void MqttPublishPowerState(uint32_t device) {
     GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, (Settings->flag.mqtt_response) ? scommand : S_RSLT_RESULT);  // SetOption4 - Switch between MQTT RESULT or COMMAND
     Response_P(S_JSON_COMMAND_SVALUE, scommand, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
     MqttPublish(stopic);
+#endif  // #ifndef FIRMWARE_ZIOT_SONOFF
 
+#ifndef FIRMWARE_ZIOT_SONOFF
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, scommand);
       Response_P(GetStateText(bitRead(TasmotaGlobal.power, device -1)));
       MqttPublish(stopic, Settings->flag.mqtt_power_retain);  // CMND_POWERRETAIN
     }
+#else  // FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT_MINIMAL
+    if (bitRead(TasmotaGlobal.power, 0) == 0) {
+      UpdateShadowWithDesired(false);
+    }
+    else {
+      UpdateShadowWithDesired(true);
+    }
+#endif  // FIRMWARE_ZIOT_MINIMAL
+#endif  // FIRMWARE_ZIOT_SONOFF
 #ifdef USE_SONOFF_IFAN
   }
 #endif  // USE_SONOFF_IFAN
@@ -863,9 +878,11 @@ void MqttConnected(void) {
     Mqtt.retry_counter_delay = 1;
     Mqtt.connect_count++;
 
+#ifndef FIRMWARE_ZIOT_SONOFF
     GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
     Response_P(PSTR(MQTT_LWT_ONLINE));
     MqttPublish(stopic, true);
+#endif  // FIRMWARE_ZIOT_SONOFF
 
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       // Satisfy iobroker (#299)
@@ -889,9 +906,11 @@ void MqttConnected(void) {
     }
 
     XdrvCall(FUNC_MQTT_SUBSCRIBE);
+    XsnsCall(FUNC_MQTT_SUBSCRIBE);
   }
 
   if (Mqtt.initial_connection_state) {
+#ifndef FIRMWARE_ZIOT_SONOFF
     if (ResetReason() != REASON_DEEP_SLEEP_AWAKE) {
       char stopic2[TOPSZ];
       Response_P(PSTR("{\"Info1\":{\"" D_CMND_MODULE "\":\"%s\",\"" D_JSON_VERSION "\":\"%s%s\",\"" D_JSON_FALLBACKTOPIC "\":\"%s\",\"" D_CMND_GROUPTOPIC "\":\"%s\"}}"),
@@ -920,11 +939,13 @@ void MqttConnected(void) {
     }
 
     MqttPublishAllPowerState();
+#endif  // FIRMWARE_ZIOT_SONOFF
     if (Settings->tele_period) {
       TasmotaGlobal.tele_period = Settings->tele_period -5;  // Enable TelePeriod in 5 seconds
     }
     TasmotaGlobal.rules_flag.system_boot = 1;
     XdrvCall(FUNC_MQTT_INIT);
+    XsnsCall(FUNC_MQTT_INIT);
   }
   Mqtt.initial_connection_state = 0;
 
@@ -993,8 +1014,13 @@ void MqttReconnect(void) {
     mqtt_pwd = SettingsText(SET_MQTT_PWD);
   }
 
+#ifndef FIRMWARE_ZIOT_SONOFF
   GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
   Response_P(S_LWT_OFFLINE);
+#else
+  snprintf_P(stopic, sizeof(stopic), PSTR("ziot/sonoff/%s/%s/will"), "basicr2", SettingsText(SET_MQTT_TOPIC));
+  Response_P("{\"state\":{\"reported\":{\"status\":{\"isConnected\":false}}}}");
+#endif  // FIRMWARE_ZIOT_SONOFF
 
   if (MqttClient.connected()) { MqttClient.disconnect(); }
   EspClient.setTimeout(Settings->mqtt_wifi_timeout * 100);
@@ -1131,8 +1157,13 @@ void MqttReconnect(void) {
 }
 
 void MqttCheck(void) {
-  if ((nullptr == AWS_IoT_Private_Key) || (nullptr == AWS_IoT_Client_Certificate)) return;
-  
+#ifdef USE_MQTT_TLS
+  if ((nullptr == AWS_IoT_Private_Key) || (nullptr == AWS_IoT_Client_Certificate)) {
+    printf("There is no cert!\n");
+    return;
+  }
+#endif
+
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     if (!MqttIsConnected()) {
       TasmotaGlobal.global_state.mqtt_down = 1;
@@ -1521,22 +1552,22 @@ void CmndStateRetain(void) {
 /*********************************************************************************************\
  * TLS private key and certificate - store into Flash
 \*********************************************************************************************/
-#if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
-
 #ifdef ESP32
 static uint8_t * tls_spi_start = nullptr;
 const static size_t   tls_spi_len      = 0x0400;  // 1kb blocs
 const static size_t   tls_block_offset = 0x0000;  // don't need offset in FS
-#else
+#else  // Not ESP32
 // const static uint16_t tls_spi_start_sector = EEPROM_LOCATION + 4;  // 0xXXFF
 // const static uint8_t* tls_spi_start    = (uint8_t*) ((tls_spi_start_sector * SPI_FLASH_SEC_SIZE) + 0x40200000);  // 0x40XFF000
 const static uint16_t tls_spi_start_sector = 0xFF;  // Force last bank of first MB
 const static uint8_t* tls_spi_start    = (uint8_t*) 0x402FF000;  // 0x402FF000
 const static size_t   tls_spi_len      = 0x1000;  // 4kb blocs
 const static size_t   tls_block_offset = 0x0400;
-#endif
+#endif  // ESP32
 const static size_t   tls_block_len    = 0x0400;   // 1kb
 const static size_t   tls_obj_store_offset = tls_block_offset + sizeof(tls_dir_t);
+
+#if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
 
 inline void TlsEraseBuffer(uint8_t *buffer) {
   memset(buffer + tls_block_offset, 0xFF, tls_block_len);
@@ -1613,7 +1644,6 @@ void loadTlsDir(void) {
   } else {
     AWS_IoT_Client_Certificate = nullptr;
   }
-//Serial.printf("AWS_IoT_Private_Key = %x, AWS_IoT_Client_Certificate = %x\n", AWS_IoT_Private_Key, AWS_IoT_Client_Certificate);
 }
 
 const char ALLOCATE_ERROR[] PROGMEM = "TLSKey " D_JSON_ERROR ": cannot allocate buffer.";
@@ -1710,6 +1740,9 @@ bool ConvertTlsFile(uint8_t cert) {
     entry->name = TLS_NAME_CRT;
     entry->start = (tls_dir_write->entry[0].start + tls_dir_write->entry[0].len + 3) & ~0x03; // align to 4 bytes boundary
     entry->len = bin_len;
+    char temp[5];
+    snprintf_P(temp, sizeof(temp), "%d", (tls_dir_write->entry[1].start + tls_dir_write->entry[1].len + 3) & ~0x03);
+    SettingsUpdateText(SET_ENTRY2_START, temp);
     memcpy(spi_buffer + tls_obj_store_offset + entry->start, bin_buf, entry->len);
     save_file = true;
   }
@@ -1872,76 +1905,76 @@ void CmndTlsDump(void) {
  * Presentation
 \*********************************************************************************************/
 
-#ifdef USE_WEBSERVER
+// #ifdef USE_WEBSERVER
 
-#define WEB_HANDLE_MQTT "mq"
+// #define WEB_HANDLE_MQTT "mq"
 
-const char S_CONFIGURE_MQTT[] PROGMEM = D_CONFIGURE_MQTT;
+// const char S_CONFIGURE_MQTT[] PROGMEM = D_CONFIGURE_MQTT;
 
-const char HTTP_BTN_MENU_MQTT[] PROGMEM =
-  "<p><form action='" WEB_HANDLE_MQTT "' method='get'><button>" D_CONFIGURE_MQTT "</button></form></p>";
+// const char HTTP_BTN_MENU_MQTT[] PROGMEM =
+//   "<p><form action='" WEB_HANDLE_MQTT "' method='get'><button>" D_CONFIGURE_MQTT "</button></form></p>";
 
-const char HTTP_FORM_MQTT1[] PROGMEM =
-  "<fieldset><legend><b>&nbsp;" D_MQTT_PARAMETERS "&nbsp;</b></legend>"
-  "<form method='get' action='" WEB_HANDLE_MQTT "'>"
-  "<p><b>" D_HOST "</b> (" MQTT_HOST ")<br><input id='mh' placeholder=\"" MQTT_HOST "\" value=\"%s\"></p>"
-  "<p><b>" D_PORT "</b> (" STR(MQTT_PORT) ")<br><input id='ml' placeholder='" STR(MQTT_PORT) "' value='%d'></p>"
-#ifdef USE_MQTT_TLS
-  "<p><label><input id='b3' type='checkbox'%s><b>" D_MQTT_TLS_ENABLE "</b></label><br>"
-#endif // USE_MQTT_TLS
-  "<p><b>" D_CLIENT "</b> (%s)<br><input id='mc' placeholder=\"%s\" value=\"%s\"></p>";
-const char HTTP_FORM_MQTT2[] PROGMEM =
-  "<p><b>" D_USER "</b> (" MQTT_USER ")<br><input id='mu' placeholder=\"" MQTT_USER "\" value=\"%s\"></p>"
-  "<p><label><b>" D_PASSWORD "</b><input type='checkbox' onclick='sp(\"mp\")'></label><br><input id='mp' type='password' placeholder=\"" D_PASSWORD "\" value=\"" D_ASTERISK_PWD "\"></p>"
-  "<p><b>" D_TOPIC "</b> = %%topic%% (%s)<br><input id='mt' placeholder=\"%s\" value=\"%s\"></p>"
-  "<p><b>" D_FULL_TOPIC "</b> (%s)<br><input id='mf' placeholder=\"%s\" value=\"%s\"></p>";
+// const char HTTP_FORM_MQTT1[] PROGMEM =
+//   "<fieldset><legend><b>&nbsp;" D_MQTT_PARAMETERS "&nbsp;</b></legend>"
+//   "<form method='get' action='" WEB_HANDLE_MQTT "'>"
+//   "<p><b>" D_HOST "</b> (" MQTT_HOST ")<br><input id='mh' placeholder=\"" MQTT_HOST "\" value=\"%s\"></p>"
+//   "<p><b>" D_PORT "</b> (" STR(MQTT_PORT) ")<br><input id='ml' placeholder='" STR(MQTT_PORT) "' value='%d'></p>"
+// #ifdef USE_MQTT_TLS
+//   "<p><label><input id='b3' type='checkbox'%s><b>" D_MQTT_TLS_ENABLE "</b></label><br>"
+// #endif // USE_MQTT_TLS
+//   "<p><b>" D_CLIENT "</b> (%s)<br><input id='mc' placeholder=\"%s\" value=\"%s\"></p>";
+// const char HTTP_FORM_MQTT2[] PROGMEM =
+//   "<p><b>" D_USER "</b> (" MQTT_USER ")<br><input id='mu' placeholder=\"" MQTT_USER "\" value=\"%s\"></p>"
+//   "<p><label><b>" D_PASSWORD "</b><input type='checkbox' onclick='sp(\"mp\")'></label><br><input id='mp' type='password' placeholder=\"" D_PASSWORD "\" value=\"" D_ASTERISK_PWD "\"></p>"
+//   "<p><b>" D_TOPIC "</b> = %%topic%% (%s)<br><input id='mt' placeholder=\"%s\" value=\"%s\"></p>"
+//   "<p><b>" D_FULL_TOPIC "</b> (%s)<br><input id='mf' placeholder=\"%s\" value=\"%s\"></p>";
 
-void HandleMqttConfiguration(void)
-{
-  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
+// void HandleMqttConfiguration(void)
+// {
+//   AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
 
-  if (Webserver->hasArg(F("save"))) {
-    MqttSaveSettings();
-    WebRestart(1);
-    return;
-  }
+//   if (Webserver->hasArg(F("save"))) {
+//     MqttSaveSettings();
+//     WebRestart(1);
+//     return;
+//   }
 
-  char str[TOPSZ];
+//   char str[TOPSZ];
 
-  WSContentStart_P(PSTR(D_CONFIGURE_MQTT));
-  WSContentSendStyle();
-  WSContentSend_P(HTTP_FORM_MQTT1,
-    SettingsText(SET_MQTT_HOST),
-    Settings->mqtt_port,
-#ifdef USE_MQTT_TLS
-    Mqtt.mqtt_tls ? PSTR(" checked") : "",      // SetOption102 - Enable MQTT TLS
-#endif // USE_MQTT_TLS
-    Format(str, PSTR(MQTT_CLIENT_ID), sizeof(str)), PSTR(MQTT_CLIENT_ID), SettingsText(SET_MQTT_CLIENT));
-  WSContentSend_P(HTTP_FORM_MQTT2,
-    (!strlen(SettingsText(SET_MQTT_USER))) ? "0" : SettingsText(SET_MQTT_USER),
-    Format(str, PSTR(MQTT_TOPIC), sizeof(str)), PSTR(MQTT_TOPIC), SettingsText(SET_MQTT_TOPIC),
-    PSTR(MQTT_FULLTOPIC), PSTR(MQTT_FULLTOPIC), SettingsText(SET_MQTT_FULLTOPIC));
-  WSContentSend_P(HTTP_FORM_END);
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-  WSContentStop();
-}
+//   WSContentStart_P(PSTR(D_CONFIGURE_MQTT));
+//   WSContentSendStyle();
+//   WSContentSend_P(HTTP_FORM_MQTT1,
+//     SettingsText(SET_MQTT_HOST),
+//     Settings->mqtt_port,
+// #ifdef USE_MQTT_TLS
+//     Mqtt.mqtt_tls ? PSTR(" checked") : "",      // SetOption102 - Enable MQTT TLS
+// #endif // USE_MQTT_TLS
+//     Format(str, PSTR(MQTT_CLIENT_ID), sizeof(str)), PSTR(MQTT_CLIENT_ID), SettingsText(SET_MQTT_CLIENT));
+//   WSContentSend_P(HTTP_FORM_MQTT2,
+//     (!strlen(SettingsText(SET_MQTT_USER))) ? "0" : SettingsText(SET_MQTT_USER),
+//     Format(str, PSTR(MQTT_TOPIC), sizeof(str)), PSTR(MQTT_TOPIC), SettingsText(SET_MQTT_TOPIC),
+//     PSTR(MQTT_FULLTOPIC), PSTR(MQTT_FULLTOPIC), SettingsText(SET_MQTT_FULLTOPIC));
+//   WSContentSend_P(HTTP_FORM_END);
+//   WSContentSpaceButton(BUTTON_CONFIGURATION);
+//   WSContentStop();
+// }
 
-void MqttSaveSettings(void) {
-  String cmnd = F(D_CMND_BACKLOG "0 ");
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTHOST), PSTR("mh"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTPORT), PSTR("ml"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTCLIENT), PSTR("mc"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTUSER), PSTR("mu"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_MQTTPASSWORD "2"), PSTR("mp"), PSTR("\""));
-  cmnd += AddWebCommand(PSTR(D_CMND_TOPIC), PSTR("mt"), PSTR("1"));
-  cmnd += AddWebCommand(PSTR(D_CMND_FULLTOPIC), PSTR("mf"), PSTR("1"));
-#ifdef USE_MQTT_TLS
-  cmnd += F(";" D_CMND_SO "102 ");
-  cmnd += Webserver->hasArg(F("b3"));  // SetOption102 - Enable MQTT TLS
-#endif
-  ExecuteWebCommand((char*)cmnd.c_str());
-}
-#endif  // USE_WEBSERVER
+// void MqttSaveSettings(void) {
+//   String cmnd = F(D_CMND_BACKLOG "0 ");
+//   cmnd += AddWebCommand(PSTR(D_CMND_MQTTHOST), PSTR("mh"), PSTR("1"));
+//   cmnd += AddWebCommand(PSTR(D_CMND_MQTTPORT), PSTR("ml"), PSTR("1"));
+//   cmnd += AddWebCommand(PSTR(D_CMND_MQTTCLIENT), PSTR("mc"), PSTR("1"));
+//   cmnd += AddWebCommand(PSTR(D_CMND_MQTTUSER), PSTR("mu"), PSTR("1"));
+//   cmnd += AddWebCommand(PSTR(D_CMND_MQTTPASSWORD "2"), PSTR("mp"), PSTR("\""));
+//   cmnd += AddWebCommand(PSTR(D_CMND_TOPIC), PSTR("mt"), PSTR("1"));
+//   cmnd += AddWebCommand(PSTR(D_CMND_FULLTOPIC), PSTR("mf"), PSTR("1"));
+// #ifdef USE_MQTT_TLS
+//   cmnd += F(";" D_CMND_SO "102 ");
+//   cmnd += Webserver->hasArg(F("b3"));  // SetOption102 - Enable MQTT TLS
+// #endif
+//   ExecuteWebCommand((char*)cmnd.c_str());
+// }
+// #endif  // USE_WEBSERVER
 
 /*********************************************************************************************\
  * Interface
@@ -1958,19 +1991,20 @@ bool Xdrv02(uint8_t function)
         break;
 #ifdef USE_WEBSERVER
       case FUNC_WEB_ADD_BUTTON:
-        WSContentSend_P(HTTP_BTN_MENU_MQTT);
+        // WSContentSend_P(HTTP_BTN_MENU_MQTT);
         break;
       case FUNC_WEB_ADD_HANDLER:
-        WebServer_on(PSTR("/" WEB_HANDLE_MQTT), HandleMqttConfiguration);
+        // WebServer_on(PSTR("/" WEB_HANDLE_MQTT), HandleMqttConfiguration);
         break;
 #endif  // USE_WEBSERVER
       case FUNC_COMMAND:
         result = DecodeCommand(kMqttCommands, MqttCommand, kMqttSynonyms);
         break;
       case FUNC_PRE_INIT:
-        if (TasmotaGlobal.cert_info_flag) {
+        // printf("cert info flag : %d\n", TasmotaGlobal.cert_info_flag);
+        // if (TasmotaGlobal.cert_info_flag) {
           MqttInit();
-        }
+        // }
         break;
     }
   }

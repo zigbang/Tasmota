@@ -1,5 +1,5 @@
 /*
-    xsns_88_smart_roll.ino - ESP32 Temperature and Hall Effect sensor for Tasmota
+    xsns_88_smart_roll.ino - ESP32 based blind for Tasmota
 */
 
 #ifdef FIRMWARE_SMART_ROLL

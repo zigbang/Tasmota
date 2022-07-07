@@ -165,7 +165,7 @@ const uint8_t OTA_ATTEMPTS = 10;            // Number of times to try fetching t
 const uint8_t OTA_ATTEMPTS = 5;             // Number of times to try fetching the new firmware
 #endif  // ESP8266
 
-const uint16_t FLOATSZ = 16;                // Max number of characters in float result from dtostrfd (max 32)
+const uint16_t FLOATSZ = 1;                // Max number of characters in float result from dtostrfd (max 32)
 const uint16_t CMDSZ = 24;                  // Max number of characters in command
 const uint16_t TOPSZ = 70;                 // Max number of characters in topic string
 
@@ -336,7 +336,7 @@ enum XsnsFunctions {FUNC_SETTINGS_OVERRIDE, FUNC_PIN_STATE, FUNC_MODULE_INIT, FU
 
 enum AddressConfigSteps { ADDR_IDLE, ADDR_RECEIVE, ADDR_SEND };
 
-enum SettingsTextIndex { SET_ID_TOKEN, SET_OTAURL,
+enum SettingsTextIndex { SET_ID_TOKEN, SET_PNU, SET_DONGHO, SET_ENV, SET_OTAURL, SET_CERT_ARN, SET_ENTRY2_START,
                          SET_MQTTPREFIX1, SET_MQTTPREFIX2, SET_MQTTPREFIX3,  // MAX_MQTT_PREFIXES
                          SET_STASSID1, SET_STASSID2,  // MAX_SSIDS
                          SET_STAPWD1, SET_STAPWD2,  // MAX_SSIDS
