@@ -2,6 +2,7 @@ Import('env')
 import os
 import shutil
 import gzip
+import glob
 
 platform = env.PioPlatform()
 board = env.BoardConfig()
@@ -12,11 +13,26 @@ if env["PIOPLATFORM"] != "espressif32":
     OUTPUT_DIR = "build_output{}".format(os.path.sep)
 
     def bin_gzip(source, target, env):
+        version = "none"
+
+        my_flags = env.ParseFlags(env['BUILD_FLAGS'])
+        for x in my_flags.get("CPPDEFINES"):
+            if isinstance(x, list):
+                k, v = x
+                if k == "FW_VERSION":
+                    version = v
+                    break
+
         variant = str(target[0]).split(os.path.sep)[2]
 
+        files = glob.glob("{}firmware{}{}-*.bin.gz".format(OUTPUT_DIR, os.path.sep, variant))
+        for f in files:
+            print(f)
+            os.remove(f)
+
         # create string with location and file names based on variant
-        bin_file = "{}firmware{}{}.bin".format(OUTPUT_DIR, os.path.sep, variant)
-        gzip_file = "{}firmware{}{}.bin.gz".format(OUTPUT_DIR, os.path.sep, variant)
+        bin_file = "{}firmware{}{}-{}.bin".format(OUTPUT_DIR, os.path.sep, variant, version)
+        gzip_file = "{}firmware{}{}-{}.bin.gz".format(OUTPUT_DIR, os.path.sep, variant, version)
 
         # check if new target files exist and remove if necessary
         if os.path.isfile(gzip_file): os.remove(gzip_file)

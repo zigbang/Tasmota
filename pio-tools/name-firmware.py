@@ -1,11 +1,27 @@
 Import('env')
 import os
 import shutil
+import glob
 
 OUTPUT_DIR = "build_output{}".format(os.path.sep)
 
 def bin_map_copy(source, target, env):
+    version = "none"
+
+    my_flags = env.ParseFlags(env['BUILD_FLAGS'])
+    for x in my_flags.get("CPPDEFINES"):
+        if isinstance(x, list):
+            k, v = x
+            if k == "FW_VERSION":
+                version = v
+                break
+
     variant = str(target[0]).split(os.path.sep)[2]
+
+    files = glob.glob("{}firmware{}{}-*.bin".format(OUTPUT_DIR, os.path.sep, variant))
+    for f in files:
+        print(f)
+        os.remove(f)
     
     # check if output directories exist and create if necessary
     if not os.path.isdir(OUTPUT_DIR):
@@ -17,7 +33,7 @@ def bin_map_copy(source, target, env):
 
     # create string with location and file names based on variant
     map_file = "{}map{}{}.map".format(OUTPUT_DIR, os.path.sep, variant)
-    bin_file = "{}firmware{}{}.bin".format(OUTPUT_DIR, os.path.sep, variant)
+    bin_file = "{}firmware{}{}-{}.bin".format(OUTPUT_DIR, os.path.sep, variant, version)
 
     # check if new target files exist and remove if necessary
     for f in [map_file, bin_file]:
