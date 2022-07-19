@@ -20,7 +20,6 @@ def bin_map_copy(source, target, env):
 
     files = glob.glob("{}firmware{}{}-*.bin".format(OUTPUT_DIR, os.path.sep, variant))
     for f in files:
-        print(f)
         os.remove(f)
     
     # check if output directories exist and create if necessary
@@ -34,8 +33,6 @@ def bin_map_copy(source, target, env):
     # create string with location and file names based on variant
     map_file = "{}map{}{}.map".format(OUTPUT_DIR, os.path.sep, variant)
     bin_file = "{}firmware{}{}-{}.bin".format(OUTPUT_DIR, os.path.sep, variant, version)
-    print(bin_file)
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
     # check if new target files exist and remove if necessary
     for f in [map_file, bin_file]:
