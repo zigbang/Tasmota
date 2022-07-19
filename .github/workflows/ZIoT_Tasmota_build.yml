@@ -2,12 +2,12 @@ name: Build_firmware_ziot_tasmota
 
 on:
   push:
-    branches: [ "ZIoT-Tasmota" ]
+    branches: [ "ZIoT-Tasmota/master" ]
     paths-ignore:
     - '.github/**'
     - '**.md'
   pull_request:
-    branches: [ "ZIoT-Tasmota" ]
+    branches: [ "ZIoT-Tasmota/master" ]
     paths-ignore:
     - '.github/**'
     - '**.md'
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ZIoT-Tasmota
+          ref: ZIoT-Tasmota/develop
       - name: Set up Python
         uses: actions/setup-python@v2
       - name: Install dependencies
