@@ -24,6 +24,8 @@
 #define SWITCH_OFF 0
 #define SWITCH_ON 1
 
+#define URL_SCHEME "http://"
+
 #ifndef FIRMWARE_ZIOT_MINIMAL
 struct TimeoutChecker {
     uint32_t startTime = 0;
@@ -42,7 +44,7 @@ struct WiFiConfig {
 struct ZIoTSonoff {
     bool ready = false;
     uint32_t sessionId = 0;
-    char* version = "1.0.3";
+    char* version = "1.0.4";
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
     char shadowTopic[70];
@@ -487,8 +489,8 @@ bool Xsns89(uint8_t function)
                             JsonParserObject data = root["data"].getObject();
                             JsonParserObject ota = data["ota"].getObject();
                             String newVersion = ota["newVersion"].getStr();
-                            String targetUrl = ota["targetUrl"].getStr();
-                            String minimalUrl = ota["minimalUrl"].getStr();
+                            String targetUrl = String(URL_SCHEME) + ota["targetUrl"].getStr();
+                            String minimalUrl = String(URL_SCHEME) + ota["minimalUrl"].getStr();
 
                             if (sessionId.length()) {
                                 char* sessionIdCharType = (char*)sessionId.c_str();
@@ -501,7 +503,7 @@ bool Xsns89(uint8_t function)
                                     char* minimalUrlCharType = (char*)minimalUrl.c_str();
                                     char* targetUrlCharType = (char*)targetUrl.c_str();
 
-                                    if ((targetUrl.length() && minimalUrl.length()) && ((strcmp(minimalUrlCharType, "false") != 0) && (strcmp(targetUrlCharType, "false") != 0))) {
+                                    if (((targetUrl.length() > 13) && (minimalUrl.length() > 13)) && ((strcmp(minimalUrlCharType, URL_SCHEME) != 0) && (strcmp(targetUrlCharType, URL_SCHEME) != 0))) {
                                         SaveTargetOtaUrl(targetUrlCharType);
                                         strcpy(TasmotaGlobal.sonoff_ota_url, minimalUrlCharType);
 

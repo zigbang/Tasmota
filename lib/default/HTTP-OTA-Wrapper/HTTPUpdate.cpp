@@ -18,7 +18,7 @@ HTTPUpdateResult HTTPUpdate::handleUpdate(HTTPClient &http, const String &curren
     // use HTTP/1.0 for update since the update handler not support any transfer Encoding
     http.useHTTP10(true);
     http.setTimeout(8000);
-    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     http.setUserAgent(F("ESP8266-http-Update"));
     http.addHeader(F("x-ESP8266-Chip-ID"), String(ESP.getChipId()));
     http.addHeader(F("x-ESP8266-STA-MAC"), WiFi.macAddress());
@@ -119,12 +119,12 @@ HTTPUpdateResult HTTPUpdate::handleUpdate(HTTPClient &http, const String &curren
 
                 WiFiClient *tcp = http.getStreamPtr();
 
-                if (_closeConnectionsOnUpdate)
-                {
-                    WiFiUDP::stopAll();
-                    WiFiClient::stopAllExcept(tcp);
-                }
-
+                // if (_closeConnectionsOnUpdate)
+                // {
+                //     WiFiUDP::stopAll();
+                //     printf("hi3-2\n");
+                //     WiFiClient::stopAllExcept(tcp);
+                // }
                 delay(100);
 
                 int command;
