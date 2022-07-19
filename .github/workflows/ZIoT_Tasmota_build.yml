@@ -49,4 +49,4 @@ jobs:
         run: |
           aws s3 cp \
             --region ap-northeast-2 \
-            $(ls build_output/firmware/${{ matrix.variant }}-*.bin) s3://ziot-dev-tasmota-firmware-bucket/${{ matrix.variant }}/
+            $(ls ./build_output/firmware/${{ matrix.variant }}-*.bin) s3://ziot-dev-tasmota-firmware-bucket/${{ matrix.variant }}/
