@@ -188,7 +188,7 @@ void WifiBegin(uint8_t flag, uint8_t channel)
 //  if (WiFi.getPhyMode() != WIFI_PHY_MODE_11N) { WiFi.setPhyMode(WIFI_PHY_MODE_11N); }  // B/G/N
 //  if (WiFi.getPhyMode() != WIFI_PHY_MODE_11G) { WiFi.setPhyMode(WIFI_PHY_MODE_11G); }  // B/G
   if (!WiFi.getAutoConnect()) { WiFi.setAutoConnect(true); }
-//  WiFi.setAutoReconnect(true);
+  WiFi.setAutoReconnect(true);
   switch (flag) {
   case 0:  // AP1
   case 1:  // AP2
