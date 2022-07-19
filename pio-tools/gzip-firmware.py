@@ -27,7 +27,6 @@ if env["PIOPLATFORM"] != "espressif32":
 
         files = glob.glob("{}firmware{}{}-*.bin.gz".format(OUTPUT_DIR, os.path.sep, variant))
         for f in files:
-            print(f)
             os.remove(f)
 
         # create string with location and file names based on variant
