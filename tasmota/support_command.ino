@@ -254,9 +254,9 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
     grpflg, type, index, data_len, (binary_data) ? HexToString((uint8_t*)dataBuf, data_len).c_str() : dataBuf);
 
   if (type != nullptr) {
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_ERROR "\"}"));
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
     if (Settings->ledstate &0x02) { TasmotaGlobal.blinks++; }
 
@@ -309,14 +309,14 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
 
   }
 
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
   if (type == nullptr) {
     TasmotaGlobal.blinks = 201;
     snprintf_P(stemp1, sizeof(stemp1), PSTR(D_JSON_COMMAND));
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_UNKNOWN "\"}"));
     type = (char*)stemp1;
   }
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
   if (ResponseLength()) {
     MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, type);
@@ -749,12 +749,12 @@ void CmndUpgrade(void)
   // Check if the version we have been asked to upgrade to is higher than our current version.
   //   We also need at least 3 chars to make a valid version number string.
   if (((1 == XdrvMailbox.data_len) && (1 == XdrvMailbox.payload)) || ((XdrvMailbox.data_len >= 3) && NewerVersion(XdrvMailbox.data))) {
-#ifdef FIRMWARE_ZIOT_SONOFF
-    strcpy(TasmotaGlobal.sonoff_ota_url, SettingsText(SET_OTAURL));
+#ifdef FIRMWARE_ZIOT
+    strcpy(TasmotaGlobal.ziot_ota_url, SettingsText(SET_OTAURL));
 #ifndef FIRMWARE_ZIOT_MINIMAL
     SaveTargetOtaUrl("http://13.209.165.165/ota");
 #endif  // FIRMWARE_ZIOT_MINIMAL
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
     TasmotaGlobal.ota_state_flag = 3;
     char stemp1[TOPSZ];
     Response_P(PSTR("{\"%s\":\"" D_JSON_VERSION " %s " D_JSON_FROM " %s\"}"), XdrvMailbox.command, TasmotaGlobal.version, GetOtaUrl(stemp1, sizeof(stemp1)));

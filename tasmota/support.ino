@@ -1238,7 +1238,7 @@ int Response_P(const char* format, ...)        // Content send snprintf_P char d
 #endif
 }
 
-#ifdef FIRMWARE_ZIOT_SONOFF
+#ifdef FIRMWARE_ZIOT
 #ifndef FIRMWARE_ZIOT_MINIMAL
 int ResponseWithVaList(const char* format, va_list va)
 {
@@ -1263,7 +1263,7 @@ int ResponseWithVaList(const char* format, va_list va)
 #endif  // MQTT_DATA_STRING
 }
 #endif  // FIRMWARE_ZIOT_MINIMAL
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
 int ResponseTime_P(const char* format, ...)    // Content send snprintf_P char data
 {

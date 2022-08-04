@@ -23,22 +23,26 @@
 
 // #define DEBUG_DUMP_TLS    // allow dumping of TLS Flash keys
 
+#ifndef FIRMWARE_ZIOT
 class tls_entry_t {
 public:
   uint32_t name;    // simple 4 letters name. Currently 'skey', 'crt ', 'crt1', 'crt2'
   uint16_t start;   // start offset
   uint16_t len;     // len of object
 };                  // 8 bytes
+#endif  // FIRMWARE_ZIOT
 
 const static uint32_t TLS_NAME_SKEY = 0x2079656B; // 'key ' little endian
 const static uint32_t TLS_NAME_CRT  = 0x20747263; // 'crt ' little endian
 
+#ifndef FIRMWARE_ZIOT
 class tls_dir_t {
 public:
   tls_entry_t entry[4];     // 4 entries max, only 4 used today, for future use
 };                          // 4*8 = 64 bytes
 
 tls_dir_t tls_dir;          // memory copy of tls_dir from flash
+#endif  // FIRMWARE_ZIOT
 
 #ifdef USE_MQTT_TLS
   #include "WiFiClientSecureLightBearSSL.h"
@@ -878,11 +882,11 @@ void MqttConnected(void) {
     Mqtt.retry_counter_delay = 1;
     Mqtt.connect_count++;
 
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
     GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
     Response_P(PSTR(MQTT_LWT_ONLINE));
     MqttPublish(stopic, true);
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       // Satisfy iobroker (#299)
@@ -910,7 +914,7 @@ void MqttConnected(void) {
   }
 
   if (Mqtt.initial_connection_state) {
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
     if (ResetReason() != REASON_DEEP_SLEEP_AWAKE) {
       char stopic2[TOPSZ];
       Response_P(PSTR("{\"Info1\":{\"" D_CMND_MODULE "\":\"%s\",\"" D_JSON_VERSION "\":\"%s%s\",\"" D_JSON_FALLBACKTOPIC "\":\"%s\",\"" D_CMND_GROUPTOPIC "\":\"%s\"}}"),
@@ -939,7 +943,7 @@ void MqttConnected(void) {
     }
 
     MqttPublishAllPowerState();
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
     if (Settings->tele_period) {
       TasmotaGlobal.tele_period = Settings->tele_period -5;  // Enable TelePeriod in 5 seconds
     }
@@ -1014,13 +1018,13 @@ void MqttReconnect(void) {
     mqtt_pwd = SettingsText(SET_MQTT_PWD);
   }
 
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
   GetTopic_P(stopic, TELE, TasmotaGlobal.mqtt_topic, S_LWT);
   Response_P(S_LWT_OFFLINE);
-#else
+#else // need to change
   snprintf_P(stopic, sizeof(stopic), PSTR("ziot/sonoff/%s/%s/will"), "basicr2", SettingsText(SET_MQTT_TOPIC));
   Response_P("{\"state\":{\"reported\":{\"status\":{\"isConnected\":false}}}}");
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
   if (MqttClient.connected()) { MqttClient.disconnect(); }
   EspClient.setTimeout(Settings->mqtt_wifi_timeout * 100);
@@ -1552,6 +1556,7 @@ void CmndStateRetain(void) {
 /*********************************************************************************************\
  * TLS private key and certificate - store into Flash
 \*********************************************************************************************/
+#ifndef FIRMWARE_ZIOT
 #ifdef ESP32
 static uint8_t * tls_spi_start = nullptr;
 const static size_t   tls_spi_len      = 0x0400;  // 1kb blocs
@@ -1566,7 +1571,7 @@ const static size_t   tls_block_offset = 0x0400;
 #endif  // ESP32
 const static size_t   tls_block_len    = 0x0400;   // 1kb
 const static size_t   tls_obj_store_offset = tls_block_offset + sizeof(tls_dir_t);
-
+#endif  // FIRMWARE_ZIOT
 #if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
 
 inline void TlsEraseBuffer(uint8_t *buffer) {
