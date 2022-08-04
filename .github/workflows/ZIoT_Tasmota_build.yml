@@ -27,6 +27,7 @@ jobs:
           - ziot-sonoff-minimal
           - ziot-sonoff
           - smart-roll-esp-wrover
+          - ziot-uart-module
     steps:
       - uses: actions/checkout@v3
         with:
