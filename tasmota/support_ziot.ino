@@ -41,8 +41,6 @@ const static size_t   tls_block_offset = 0x0400;
 const static size_t   tls_block_len    = 0x0400;   // 1kb
 const static size_t   tls_obj_store_offset = tls_block_offset + sizeof(tls_dir_t);
 
-#ifndef FIRMWARE_ZIOT_MINIMAL
-
 struct ZIoT {
     char* version;
     char* schemeVersion;
@@ -56,6 +54,8 @@ struct ZIoT {
     typedef void (*timerCallback)(void);
     timerCallback timerList[TIMER_MAX_COUNTS];
 } ziot;
+
+#ifndef FIRMWARE_ZIOT_MINIMAL
 
 uint32_t GetSessionId(void)
 {
@@ -321,14 +321,16 @@ void ZIoTHandler(uint8_t function)
 {
     if (FUNC_PRE_INIT == function)
     {
-#ifdef FIRMWARE_ZIOT_MINIMAL            
+#ifdef FIRMWARE_ZIOT_MINIMAL
         LoadTargetOtaUrl();
-#else
+        ziot.ready = true;
+#endif  // FIRMWARE_ZIOT_MINIMAL
     }
     else if (ziot.ready)
     {
         switch (function)
         {
+#ifndef FIRMWARE_ZIOT_MINIMAL
             case FUNC_MQTT_INIT:
                 InitWifiConfig();
                 PublishHello(ziot.mainTopic);
