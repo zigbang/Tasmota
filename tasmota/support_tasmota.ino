@@ -1122,11 +1122,11 @@ void Every250mSeconds(void)
         ota_retry_counter--;
         if (ota_retry_counter) {
           char ota_url[TOPSZ];
-#ifndef FIRMWARE_ZIOT_SONOFF
+#ifndef FIRMWARE_ZIOT
           strlcpy(full_ota_url, GetOtaUrl(ota_url, sizeof(ota_url)), sizeof(full_ota_url));
 #else
-          strlcpy(full_ota_url, TasmotaGlobal.sonoff_ota_url, sizeof(full_ota_url));
-#endif  // FIRMWARE_ZIOT_SONOFF
+          strlcpy(full_ota_url, TasmotaGlobal.ziot_ota_url, sizeof(full_ota_url));
+#endif  // FIRMWARE_ZIOT
 #ifdef ESP8266
 #ifndef FIRMWARE_MINIMAL
           if (RtcSettings.ota_loader) {
