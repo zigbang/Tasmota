@@ -40,9 +40,9 @@
 #undef  MQTT_PORT
 #define MQTT_PORT         8883                   // [MqttPort] MQTT port (10123 on CloudMQTT)
 
-#ifdef FIRMWARE_ZIOT_SONOFF
-#define API_HOST_DEV          "20381d0991.execute-api.ap-northeast-2.amazonaws.com"
-#define API_HOST_PROD          "20381d0991.execute-api.ap-northeast-2.amazonaws.com"
+#ifdef FIRMWARE_ZIOT
+#define API_HOST_DEV          "fpshfqmwfl.execute-api.ap-northeast-2.amazonaws.com"
+#define API_HOST_PROD          "fpshfqmwfl.execute-api.ap-northeast-2.amazonaws.com"
 #define LAMBDA_CERT_URL_DEV   "/dev/certificate"
 #define LAMBDA_CERT_URL_PROD   "/prod/certificate"
 
@@ -55,7 +55,7 @@
 #define LAMBDA_CERT_URL_PROD   "/prod/cert"
 
 #define AWS_FINGERPRINT   "e8 c3 8d d8 41 15 1b 6d a9 9c 26 36 29 30 b2 14 f7 71 0d 1c"
-#endif  // FIRMWARE_ZIOT_SONOFF
+#endif  // FIRMWARE_ZIOT
 
 // -- Ota -----------------------------------------
 #define USE_ARDUINO_OTA                          // Add optional support for Arduino OTA (+13k code)
