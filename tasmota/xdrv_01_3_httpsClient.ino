@@ -61,7 +61,11 @@ void GetCertification(void) {
                     "Connection: close\r\n\r\n";
 
         free(host);
+#ifdef ESP8266
         client.write(payload.c_str());
+#elif ESP32
+        client.write((const uint8_t*)payload.c_str(), payload.length());
+#endif  // ESP8266
         payload.~String();
 
         String headers = "";

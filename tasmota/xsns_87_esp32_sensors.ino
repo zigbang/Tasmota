@@ -17,6 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef FIRMWARE_ZIOT
 #ifdef ESP32
 // Below test to solve ESP32-C3 compilations (20210420)
 #if CONFIG_IDF_TARGET_ESP32
@@ -128,3 +129,4 @@ bool Xsns87(uint8_t function) {
 
 #endif  // CONFIG_IDF_TARGET_ESP32
 #endif  // ESP32
+#endif  // FIRMWARE_ZIOT

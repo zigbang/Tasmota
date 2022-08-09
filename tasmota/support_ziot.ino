@@ -4,8 +4,9 @@
 
 #ifdef FIRMWARE_ZIOT
 
-#define HEALTH_CHECK_PERIOD 80
+#define HEALTH_CHECK_PERIOD 300
 #define URL_SCHEME "http://"
+#define URL_SIZE 100
 
 #define TIMER_HELLO_START 0
 #define TIMER_CHITCHAT_START 1
@@ -27,6 +28,7 @@ public:
 tls_dir_t tls_dir;          // memory copy of tls_dir from flash
 
 #ifdef ESP32
+static uint8_t * ziot_spi_start = nullptr;
 static uint8_t * tls_spi_start = nullptr;
 const static size_t   tls_spi_len      = 0x0400;  // 1kb blocs
 const static size_t   tls_block_offset = 0x0000;  // don't need offset in FS
@@ -50,6 +52,7 @@ struct ZIoT {
     bool ready = false;
     uint32_t sessionId = 0;
     uint32_t second = 0;
+    bool needHello = true;
 
     typedef void (*timerCallback)(void);
     timerCallback timerList[TIMER_MAX_COUNTS];
@@ -269,18 +272,32 @@ void MakeStatusesLastFormat(uint8_t numberOfArray, char** codeArray, char** valu
 
 bool SaveTargetOtaUrl(char* url)
 {
-    uint8_t *spi_buffer = (uint8_t*)malloc(tls_spi_len);
+    uint8_t *spi_buffer = (uint8_t*)malloc(URL_SIZE);
     if (!spi_buffer) {
-        printf("Can't allocate memory to spi_buffer!\n");
+        printf("[ZIoT] Can't allocate memory to spi_buffer!\n");
         return false;
     }
 
+#ifdef ESP8266
     memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
     uint16_t startAddress = atoi(SettingsText(SET_ENTRY2_START));
     memcpy(spi_buffer + tls_obj_store_offset + startAddress, url, strlen(url) + 1);
     if (ESP.flashEraseSector(tls_spi_start_sector)) {
         ESP.flashWrite(tls_spi_start_sector * SPI_FLASH_SEC_SIZE, (uint32_t*)spi_buffer, SPI_FLASH_SEC_SIZE);
     }
+#elif ESP32
+    if (ziot_spi_start != nullptr)
+    {
+        memcpy_P(spi_buffer, ziot_spi_start, URL_SIZE);
+    }
+    else
+    {
+        memset(spi_buffer, 0, URL_SIZE);
+    }
+
+    memcpy(spi_buffer, url, URL_SIZE);
+    OsalSaveNvm("/target_ota_url", spi_buffer, URL_SIZE);
+#endif
     free(spi_buffer);
 }
 
@@ -288,6 +305,7 @@ bool SaveTargetOtaUrl(char* url)
 
 bool LoadTargetOtaUrl(void)
 {
+#ifdef ESP8266
     tls_dir_t tls_dir_2;
     uint16_t startAddress;
     if (strcmp(SettingsText(SET_ENTRY2_START), "") != 0) {
@@ -297,6 +315,27 @@ bool LoadTargetOtaUrl(void)
         char* data = (char *) (tls_spi_start + tls_obj_store_offset + startAddress);
         strcpy(TasmotaGlobal.ziot_ota_url, data);
     }
+#elif ESP32
+    if (ziot_spi_start == nullptr)
+    {
+        ziot_spi_start = (uint8_t*)malloc(URL_SIZE);
+        if (ziot_spi_start == nullptr)
+        {
+            printf("[ZIoT] free memory is not enough");
+            return false;
+        }
+    }
+
+    if (!OsalLoadNvm("/target_ota_url", ziot_spi_start, URL_SIZE))
+    {
+        printf("[ZIoT] Target ota url file doesn't exist");
+    }
+    else
+    {
+        memcpy_P(TasmotaGlobal.ziot_ota_url, ziot_spi_start, URL_SIZE);
+        printf("LoadTargetOtaUrl : %s\n", TasmotaGlobal.ziot_ota_url);
+    }
+#endif
 }
 
 void ZIoTButtonHandler(void)
@@ -333,7 +372,10 @@ void ZIoTHandler(uint8_t function)
 #ifndef FIRMWARE_ZIOT_MINIMAL
             case FUNC_MQTT_INIT:
                 InitWifiConfig();
+#ifdef ESP8266
                 PublishHello(ziot.mainTopic);
+                ziot.timerList[TIMER_HELLO_START]();
+#endif
                 break;
             case FUNC_MQTT_SUBSCRIBE:
                 SubscribeTopicWithPostfix(ziot.mainTopic, "/hello/accepted");
@@ -375,9 +417,18 @@ void ZIoTHandler(uint8_t function)
             case FUNC_EVERY_SECOND:
                 ziot.second++;
 
-                if (!TasmotaGlobal.global_state.mqtt_down && ziot.second == HEALTH_CHECK_PERIOD) {
+                if (!TasmotaGlobal.global_state.mqtt_down && ziot.second == HEALTH_CHECK_PERIOD)
+                {
                     PublishChitChat(ziot.mainTopic);
+                    ziot.second = 0;
                 }
+#ifdef ESP32
+                else if (!TasmotaGlobal.global_state.mqtt_down && ziot.needHello && ziot.second >= 40) {
+                    PublishHello(ziot.mainTopic);
+                    ziot.timerList[TIMER_HELLO_START]();
+                    ziot.needHello = false;
+                }
+#endif  // ESP32
                 break;
 #endif  // FIRMWARE_ZIOT_MINIMAL
             case FUNC_BUTTON_PRESSED:
