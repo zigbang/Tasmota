@@ -1359,7 +1359,6 @@ void Every250mSeconds(void)
 #ifdef USE_WEBSERVER
       if (!Settings->webserver) {
         StopWebserver();
-        // StopWebserverSecure();
       }
 #ifdef USE_EMULATION
       if (Settings->flag2.emulation) { UdpConnect(); }
@@ -1441,7 +1440,6 @@ void HTTPSOTAInit(void)
 #ifdef USE_WEBSERVER
     if (Settings->webserver) {
       StopWebserver();
-      StopWebserverSecure();
     }
 #endif  // USE_WEBSERVER
 #ifdef USE_ARILUX_RF
@@ -1517,7 +1515,6 @@ void ArduinoOTAInit(void)
 #ifdef USE_WEBSERVER
     if (Settings->webserver) {
       StopWebserver();
-      // StopWebserverSecure();
     }
 #endif  // USE_WEBSERVER
 #ifdef USE_ARILUX_RF

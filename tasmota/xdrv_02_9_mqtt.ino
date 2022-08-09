@@ -247,8 +247,11 @@ void MqttInit(void) {
   MqttClient.setClient(EspClient);
 #endif // USE_MQTT_TLS
 
-  MqttClient.setKeepAlive(Settings->mqtt_keepalive);
-  MqttClient.setSocketTimeout(Settings->mqtt_socket_timeout);
+  MqttClient.setKeepAlive(60);
+  // MqttClient.setKeepAlive(Settings->mqtt_keepalive);
+  // MqttClient.setSocketTimeout(Settings->mqtt_socket_timeout);
+  MqttClient.setSocketTimeout(60);
+
 }
 
 #ifdef USE_MQTT_AZURE_IOT
@@ -651,7 +654,7 @@ void MqttPublishPayload(const char* topic, const char* payload, uint32_t binary_
     log_data_retained_b = F(" (" D_RETAINED ")");        // (retained)
     log_data_retained = (char*)log_data_retained_b.c_str();
   }
-  AddLogData(LOG_LEVEL_INFO, log_data_topic.c_str(), log_data_payload, log_data_retained);  // MQT: stat/tasmota/STATUS2 = {"StatusFWR":{"Version":...
+  // AddLogData(LOG_LEVEL_INFO, log_data_topic.c_str(), log_data_payload, log_data_retained);  // MQT: stat/tasmota/STATUS2 = {"StatusFWR":{"Version":...
 
   if (Settings->ledstate &0x04) {
     TasmotaGlobal.blinks++;
@@ -888,11 +891,11 @@ void MqttConnected(void) {
     MqttPublish(stopic, true);
 #endif  // FIRMWARE_ZIOT
 
-    if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
-      // Satisfy iobroker (#299)
-      ResponseClear();
-      MqttPublishPrefixTopic_P(CMND, S_RSLT_POWER);
-    }
+    // if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
+    //   // Satisfy iobroker (#299)
+    //   ResponseClear();
+    //   MqttPublishPrefixTopic_P(CMND, S_RSLT_POWER);
+    // }
 
     GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, PSTR("#"));
     MqttSubscribe(stopic);
@@ -1991,9 +1994,15 @@ bool Xdrv02(uint8_t function)
 
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     switch (function) {
+#ifdef ESP32
+      case FUNC_LOOP:
+        MqttClient.loop();
+        break;
+#else
       case FUNC_EVERY_50_MSECOND:  // https://github.com/knolleary/pubsubclient/issues/556
         MqttClient.loop();
         break;
+#endif  // ESP32
 #ifdef USE_WEBSERVER
       case FUNC_WEB_ADD_BUTTON:
         // WSContentSend_P(HTTP_BTN_MENU_MQTT);
