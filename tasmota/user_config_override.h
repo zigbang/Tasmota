@@ -41,10 +41,10 @@
 #define MQTT_PORT         8883                   // [MqttPort] MQTT port (10123 on CloudMQTT)
 
 #ifdef FIRMWARE_ZIOT
-#define API_HOST_DEV          "fpshfqmwfl.execute-api.ap-northeast-2.amazonaws.com"
-#define API_HOST_PROD          "fpshfqmwfl.execute-api.ap-northeast-2.amazonaws.com"
-#define LAMBDA_CERT_URL_DEV   "/dev/certificate"
-#define LAMBDA_CERT_URL_PROD   "/prod/certificate"
+#define API_HOST_DEV          "api-ziot-tasmota.zigbang.net"
+#define API_HOST_PROD          "api-ziot-tasmota.zigbang.net"
+#define LAMBDA_CERT_URL_DEV   "/certificate"
+#define LAMBDA_CERT_URL_PROD   "/certificate"
 
 #define AWS_FINGERPRINT   "98 0a 41 04 6e 50 88 9c 0c d0 7f 73 21 12 e3 95 aa 67 7f af"
 #else
