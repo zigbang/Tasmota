@@ -212,7 +212,7 @@ void PublishHello(char *topic)
     snprintf_P(requestTopic, sizeof(requestTopic), PSTR("%s%s"), topic, "/hello");
 
     snprintf_P(payload, sizeof(payload),
-               PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s/accepted\",\"errorTopic\":\"%s/rejected\",\"data\":{\"vendor\":\"sonoff\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"certArn\":\"%s\",\"firmwareVersion\":\"%s\"}}"),
+               PSTR("{\"clientId\":\"%s\",\"sessionId\":\"%d\",\"requestTopic\":\"%s\",\"responseTopic\":\"%s/accepted\",\"errorTopic\":\"%s/rejected\",\"data\":{\"vendor\":\"zigbang\",\"thingName\":\"%s\",\"pnu\":\"%s\",\"dongho\":\"%s\",\"certArn\":\"%s\",\"firmwareVersion\":\"%s\"}}"),
                SettingsText(SET_MQTT_TOPIC), UpdateAndGetSessionId(), requestTopic, requestTopic, requestTopic, SettingsText(SET_MQTT_TOPIC), SettingsText(SET_PNU), SettingsText(SET_DONGHO), SettingsText(SET_CERT_ARN), ziot.version);
 
     ziot.timerList[TIMER_HELLO_START]();
