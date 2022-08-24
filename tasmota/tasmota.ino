@@ -230,7 +230,6 @@ struct {
 
 TSettings* Settings = nullptr;
 
-#ifdef FIRMWARE_ZIOT_UART_MODULE
 typedef struct Packet
 {
     uint8_t seq = 0;
@@ -252,7 +251,6 @@ typedef struct UartCommandStruct
     int8_t command;
     int8_t value;
 } UartCommandStruct;
-#endif  // FIRMWARE_ZIOT_UART_MODULE
 
 #ifdef SUPPORT_IF_STATEMENT
   #include <LinkedList.h>
@@ -344,12 +342,12 @@ void setup(void) {
   String mac_part = mac_address.substring(6);
   mac_address.toLowerCase();
 
-  sprintf_P(tmp, PSTR("sonoff-%s"), mac_address.c_str());
+  sprintf_P(tmp, PSTR("ZIGBANG-%s"), mac_address.c_str());
   SettingsUpdateText(SET_MQTT_CLIENT, tmp);
   SettingsUpdateText(SET_MQTT_TOPIC, tmp);
   strcpy(TasmotaGlobal.mqtt_client, tmp);
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
-  sprintf_P(tmp, PSTR("sonoff-%s-group"), SettingsText(SET_FRIENDLYNAME1));
+  sprintf_P(tmp, PSTR("ZIGBANG-%s-group"), SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
