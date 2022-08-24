@@ -1412,8 +1412,15 @@ void HandleConfigurationWithAppForHTTP(void) {
   String dongho = stateObject["dongho"].getStr();
   String env = stateObject["env"].getStr();
 
-  if (authToken.length()) {
+  if (authToken.length() > 308) {
     save_result = SaveAccessToken((char*)authToken.c_str());
+  }
+  else
+  {
+    WSContentBegin(400, CT_APP_JSON);
+    WSContentSend_P(PSTR("{\"message\":\"Failed\", \"data\":\"Check token, ssid, and pwd again\"}"));
+    WSContentEnd();
+    return;
   }
 
   if (!save_result || !ssid.length() || !pwd.length()) {
