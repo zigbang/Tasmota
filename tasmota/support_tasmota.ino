@@ -1379,8 +1379,14 @@ void Every250mSeconds(void)
 #ifndef FIRMWARE_ZIOT_MINIMAL
       if (TasmotaGlobal.idToken_info_flag) {
         // 프로비저닝 모드
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+        TasmotaGlobal.ziot_mode = PROVISIONING_MODE;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
         ProvisioningCheck();
       } else {
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+        TasmotaGlobal.ziot_mode = STATION_MODE;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
         MqttCheck();
       }
 #else

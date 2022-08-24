@@ -36,13 +36,13 @@ struct TimeoutChecker {
 
 struct ZIoTSonoff {
     bool ready = false;
-    char* version = "1.0.9";
+    char* version = "1.0.10";
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
     char shadowTopic[70];
     char* schemeVersion = "v220530";
-    char* vendor = "sonoff";
-    char* thingType = "relay";
+    char* vendor = "zigbang";
+    char* thingType = "Switch";
     int8_t lastShadow = NO_SHADOW;
     TimeoutChecker timeoutChecker[3];
 #endif  // FIRMWARE_ZIOT_MINIMAL
@@ -199,7 +199,7 @@ bool Xsns89(uint8_t function)
                 InitZIoT(ziotSonoff.version, ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.mainTopic, StartTimerHello, StartTimerChitChat, ClearTimerChitChat);
             break;
             case FUNC_COMMAND:
-                printf("topic : %s, data : %s\n", XdrvMailbox.topic, XdrvMailbox.data);
+                // printf("topic : %s, data : %s\n", XdrvMailbox.topic, XdrvMailbox.data);
                 if (ziotSonoff.timeoutChecker[HELLO_RESPONSE_CHECKER].ready) {
                     if (strcmp(XdrvMailbox.topic, "ACCEPTED") == 0) {
                         strcpy(XdrvMailbox.topic, "");

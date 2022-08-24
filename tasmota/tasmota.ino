@@ -220,9 +220,37 @@ struct {
 #ifdef FIRMWARE_ZIOT
   char ziot_ota_url[100];
 #endif  // FIRMWARE_ZIOT
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+#define AP_MODE 0
+#define PROVISIONING_MODE 1
+#define STATION_MODE 2
+  uint8_t ziot_mode = AP_MODE;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
+
+typedef struct Packet
+{
+    uint8_t seq = 0;
+    uint8_t ack = 0;
+    char *data = nullptr;
+    int length = 0;
+    struct Packet *next;
+} Packet;
+
+typedef struct PacketQueue
+{
+    Packet *front;
+    Packet *rear;
+    int count;
+} PacketQueue;
+
+typedef struct UartCommandStruct
+{
+    int8_t command;
+    int8_t value;
+} UartCommandStruct;
 
 #ifdef SUPPORT_IF_STATEMENT
   #include <LinkedList.h>
@@ -314,12 +342,12 @@ void setup(void) {
   String mac_part = mac_address.substring(6);
   mac_address.toLowerCase();
 
-  sprintf_P(tmp, PSTR("sonoff-%s"), mac_address.c_str());
+  sprintf_P(tmp, PSTR("ZIGBANG-%s"), mac_address.c_str());
   SettingsUpdateText(SET_MQTT_CLIENT, tmp);
   SettingsUpdateText(SET_MQTT_TOPIC, tmp);
   strcpy(TasmotaGlobal.mqtt_client, tmp);
   strcpy(TasmotaGlobal.mqtt_topic, tmp);
-  sprintf_P(tmp, PSTR("sonoff-%s-group"), SettingsText(SET_FRIENDLYNAME1));
+  sprintf_P(tmp, PSTR("ZIGBANG-%s-group"), SettingsText(SET_FRIENDLYNAME1));
   SettingsUpdateText(SET_MQTT_GRP_TOPIC, tmp);
   if (strlen(SettingsText(SET_ID_TOKEN))) {
     TasmotaGlobal.idToken_info_flag = true;
