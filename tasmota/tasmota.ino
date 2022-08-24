@@ -220,9 +220,39 @@ struct {
 #ifdef FIRMWARE_ZIOT
   char ziot_ota_url[100];
 #endif  // FIRMWARE_ZIOT
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+#define AP_MODE 0
+#define PROVISIONING_MODE 1
+#define STATION_MODE 2
+  uint8_t ziot_mode = AP_MODE;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
+
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+typedef struct Packet
+{
+    uint8_t seq = 0;
+    uint8_t ack = 0;
+    char *data = nullptr;
+    int length = 0;
+    struct Packet *next;
+} Packet;
+
+typedef struct PacketQueue
+{
+    Packet *front;
+    Packet *rear;
+    int count;
+} PacketQueue;
+
+typedef struct UartCommandStruct
+{
+    int8_t command;
+    int8_t value;
+} UartCommandStruct;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
 
 #ifdef SUPPORT_IF_STATEMENT
   #include <LinkedList.h>
