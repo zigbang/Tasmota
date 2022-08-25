@@ -287,7 +287,8 @@ void MakeStatusesLastFormat(uint8_t numberOfArray, char **codeArray, char **valu
 
 bool SaveTargetOtaUrl(char *url)
 {
-    uint8_t *spi_buffer = (uint8_t *)malloc(URL_SIZE);
+    uint8_t* spi_buffer = nullptr;
+    spi_buffer = (uint8_t *)malloc(tls_spi_len);
     if (!spi_buffer)
     {
         printf("[ZIoT] Can't allocate memory to spi_buffer!\n");
@@ -309,7 +310,7 @@ bool SaveTargetOtaUrl(char *url)
     }
     else
     {
-        memset(spi_buffer, 0, URL_SIZE);
+        memset(spi_buffer, 0, tls_spi_len);
     }
 
     memcpy(spi_buffer, url, URL_SIZE);
