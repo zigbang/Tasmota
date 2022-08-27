@@ -134,8 +134,8 @@ struct MQTT {
 #ifdef USE_MQTT_AWS_IOT
 #include <base64.hpp>
 
-const br_ec_private_key *AWS_IoT_Private_Key = nullptr;
-const br_x509_certificate *AWS_IoT_Client_Certificate = nullptr;
+br_ec_private_key *AWS_IoT_Private_Key = nullptr;
+br_x509_certificate *AWS_IoT_Client_Certificate = nullptr;
 
 #endif  // USE_MQTT_AWS_IOT
 

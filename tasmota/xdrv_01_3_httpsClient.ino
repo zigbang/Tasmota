@@ -5,8 +5,6 @@
 WiFiClientSecure client;
 uint16_t provisioning_counter = 0;
 
-extern const br_ec_private_key *AWS_IoT_Private_Key;
-
 void HTTPSClientInit(void) {
     if (strlen(SettingsText(SET_ID_TOKEN)) && strlen(SettingsText(SET_STASSID1)) && strlen(SettingsText(SET_STAPWD1))) {
 #ifdef ESP8266
@@ -49,7 +47,7 @@ void GetCertification(void) {
         url = LAMBDA_CERT_URL_PROD;
     }
 
-    if ((nullptr == AWS_IoT_Private_Key) || !client.connect(host, 443)) {
+    if (!client.connect(host, 443)) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
     } else {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 성공"), host);
@@ -57,7 +55,7 @@ void GetCertification(void) {
         String payload = "GET "+ url + " HTTP/1.1\r\n" +
                     "Host: " + host + "\r\n" +
                     "User-Agent: Zigbang\r\n" +
-                    "Authorization: " + (char*)AWS_IoT_Private_Key->x + "\r\n" +
+                    "Authorization: " + TasmotaGlobal.ziot_access_token + "\r\n" +
                     "Connection: close\r\n\r\n";
 
         free(host);
