@@ -46,7 +46,8 @@
 #define LAMBDA_CERT_URL_DEV   "/certificate"
 #define LAMBDA_CERT_URL_PROD   "/certificate"
 
-#define AWS_FINGERPRINT   "98 0a 41 04 6e 50 88 9c 0c d0 7f 73 21 12 e3 95 aa 67 7f af"
+// #define AWS_FINGERPRINT   "98 0a 41 04 6e 50 88 9c 0c d0 7f 73 21 12 e3 95 aa 67 7f af"
+#define AWS_FINGERPRINT   "86 8f ab fc d2 8c 4f 66 03 37 48 98 24 b7 32 96 4c 4e 6b 33"
 #else
 #define API_HOST_DEV          "3srkj4h3d9.execute-api.ap-northeast-2.amazonaws.com"
 #define API_HOST_PROD          "3srkj4h3d9.execute-api.ap-northeast-2.amazonaws.com"
