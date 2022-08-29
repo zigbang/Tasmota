@@ -219,6 +219,7 @@ struct {
 #endif  // FIRMWARE_ZIOT_MINIMAL
 #ifdef FIRMWARE_ZIOT
   char ziot_ota_url[100];
+  char ziot_access_token[311];
 #endif  // FIRMWARE_ZIOT
 #ifdef FIRMWARE_ZIOT_UART_MODULE
 #define AP_MODE 0
