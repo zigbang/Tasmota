@@ -34,10 +34,11 @@ bool SaveAccessToken(char* accessToken) {
         memset(spi_buffer, 0, strlen(accessToken));
     }
 
-    memcpy(spi_buffer, url, strlen(accessToken));
+    memcpy(spi_buffer, accessToken, strlen(accessToken));
     OsalSaveNvm("/access_token", spi_buffer, strlen(accessToken));
 #endif
     free(spi_buffer);
+    return true;
 }
 
 void loadAccessToken(void)
@@ -60,7 +61,7 @@ void loadAccessToken(void)
         if (ziot_spi_start == nullptr)
         {
             printf("[ZIoT] free memory is not enough");
-            return false;
+            return;
         }
     }
 
@@ -74,4 +75,5 @@ void loadAccessToken(void)
         printf("Access Token : %s\n", TasmotaGlobal.ziot_access_token);
     }
 #endif
+    return;
 }
