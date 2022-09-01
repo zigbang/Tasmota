@@ -226,6 +226,7 @@ struct {
 #define PROVISIONING_MODE 1
 #define STATION_MODE 2
   uint8_t ziot_mode = AP_MODE;
+  bool isCloudConnected = false;
 #endif  // FIRMWARE_ZIOT_UART_MODULE
 } TasmotaGlobal;
 
