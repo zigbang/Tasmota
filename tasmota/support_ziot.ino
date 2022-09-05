@@ -405,6 +405,9 @@ void ZIoTHandler(uint8_t function)
         case FUNC_COMMAND:
             if (strcmp(XdrvMailbox.topic, "RES") == 0)
             {
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+                printf("[DBG] Successfully received the response of chitchat message\n");
+#endif // FIRMWARE_ZIOT_UART_MODULE
                 JsonParser parser(XdrvMailbox.data);
 
                 JsonParserObject root = parser.getRootObject();
@@ -448,11 +451,14 @@ void ZIoTHandler(uint8_t function)
                 ziot.second = 0;
             }
 #ifdef ESP32
-            else if (!TasmotaGlobal.global_state.mqtt_down && ziot.needHello && ziot.second >= 40)
+            else if (!TasmotaGlobal.global_state.mqtt_down && ziot.needHello && ziot.second >= 10)
             {
                 PublishHello(ziot.mainTopic);
                 ziot.timerList[TIMER_HELLO_START]();
                 ziot.needHello = false;
+            }
+            else if (TasmotaGlobal.global_state.mqtt_down) {
+                ziot.needHello = true;
             }
 #endif // ESP32
             break;
