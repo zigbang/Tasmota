@@ -550,6 +550,7 @@ void ParsePacket(void)
                 if (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready && (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].seq == rxAck)) {
                     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready = false;
                     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].count = 0;
+                    printf("[DBG] Received response : %s\n", data);
 
                     portENTER_CRITICAL(&rx_mutex);
                     memset(ziotUart.sendBuffer, 0, ZIOT_BUFFER_SIZE);
