@@ -914,9 +914,12 @@ void MqttConnected(void) {
 
     XdrvCall(FUNC_MQTT_SUBSCRIBE);
     XsnsCall(FUNC_MQTT_SUBSCRIBE);
+
+    TasmotaGlobal.mqtt_reconnected = true;
   }
 
   if (Mqtt.initial_connection_state) {
+    TasmotaGlobal.mqtt_reconnected = false;
 #ifndef FIRMWARE_ZIOT
     if (ResetReason() != REASON_DEEP_SLEEP_AWAKE) {
       char stopic2[TOPSZ];

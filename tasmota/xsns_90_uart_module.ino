@@ -823,7 +823,7 @@ bool Xsns90(uint8_t function)
                        SettingsText(SET_MQTT_TOPIC));
             snprintf_P(ziotUart.shadowTopic, sizeof(ziotUart.shadowTopic), PSTR("$aws/things/%s/shadow/update"),
                        SettingsText(SET_MQTT_TOPIC));
-            InitZIoT(ziotUart.version, ziotUart.schemeVersion, ziotUart.vendor, ziotUart.thingType, ziotUart.mainTopic, StartTimerHello, StartTimerChitChat, ClearTimerChitChat);
+            InitZIoT(ziotUart.version, ziotUart.schemeVersion, ziotUart.vendor, ziotUart.thingType, ziotUart.mainTopic, ziotUart.shadowTopic, StartTimerHello, StartTimerChitChat, ClearTimerChitChat);
             break;
         case FUNC_COMMAND:
             // printf("topic : %s\ndata : %s\n", XdrvMailbox.topic, XdrvMailbox.data);
@@ -834,12 +834,6 @@ bool Xsns90(uint8_t function)
                     strcpy(XdrvMailbox.topic, "");
                     ziotUart.timeoutChecker[HELLO_RESPONSE_CHECKER].ready = false;
                     ziotUart.timeoutChecker[HELLO_RESPONSE_CHECKER].count = 0;
-
-                    SubscribeTopicWithPostfix(ziotUart.shadowTopic, "/delta");
-                    SubscribeTopicWithPostfix(ziotUart.shadowTopic, "/rejected");
-                    SubscribeTopicWithPostfix(ziotUart.shadowTopic, "/accepted");
-                    SubscribeTopicWithPostfix(ziotUart.mainTopic, "/chitchat/res");
-                    SubscribeTopicWithPostfix(ziotUart.mainTopic, "/data");
 
                     ziotUart.needUpdateInitialShadow = true;
                     printf("[DBG] Successfully registered this moudle as cloud thing\n");
@@ -946,6 +940,12 @@ bool Xsns90(uint8_t function)
                     ziotUart.needUpdateInitialShadow = false;
                     ziotUart.second = 0;
                 }
+            }
+
+            if (TasmotaGlobal.mqtt_reconnected) {
+                TasmotaGlobal.mqtt_reconnected = false;
+                ziotUart.needUpdateInitialShadow = true;
+                ziotUart.second = 9;
             }
 
             CheckTimerList();

@@ -52,6 +52,7 @@ struct ZIoT
     char *vendor;
     char *thingType;
     char *mainTopic;
+    char *shadowTopic;
     bool ready = false;
     bool wifiConfigured = false;
     uint32_t sessionId = 0;
@@ -74,13 +75,14 @@ uint32_t UpdateAndGetSessionId(void)
     return ++ziot.sessionId;
 }
 
-void InitZIoT(char *version, char *schemeVersion, char *vendor, char *thingType, char *mainTopic, void (*startTimerHelloCb)(void), void (*startTimerChitChatCb)(void), void (*clearTimerChitChatCb)(void))
+void InitZIoT(char *version, char *schemeVersion, char *vendor, char *thingType, char *mainTopic, char *shadowTopic, void (*startTimerHelloCb)(void), void (*startTimerChitChatCb)(void), void (*clearTimerChitChatCb)(void))
 {
     ziot.version = (char *)malloc(strlen(version));
     ziot.schemeVersion = (char *)malloc(strlen(schemeVersion));
     ziot.vendor = (char *)malloc(strlen(vendor));
     ziot.thingType = (char *)malloc(strlen(thingType));
     ziot.mainTopic = (char *)malloc(strlen(mainTopic));
+    ziot.shadowTopic = (char *)malloc(strlen(shadowTopic));
 
     ziot.timerList[TIMER_HELLO_START] = startTimerHelloCb;
     ziot.timerList[TIMER_CHITCHAT_START] = startTimerChitChatCb;
@@ -93,6 +95,7 @@ void InitZIoT(char *version, char *schemeVersion, char *vendor, char *thingType,
         memcpy(ziot.vendor, vendor, strlen(vendor) + 1);
         memcpy(ziot.thingType, thingType, strlen(thingType) + 1);
         memcpy(ziot.mainTopic, mainTopic, strlen(mainTopic) + 1);
+        memcpy(ziot.shadowTopic, shadowTopic, strlen(shadowTopic) + 1);
 
         ziot.ready = true;
     }
@@ -103,6 +106,7 @@ void InitZIoT(char *version, char *schemeVersion, char *vendor, char *thingType,
         free(ziot.vendor);
         free(ziot.thingType);
         free(ziot.mainTopic);
+        free(ziot.shadowTopic);
     }
 }
 
@@ -401,6 +405,13 @@ void ZIoTHandler(uint8_t function)
         case FUNC_MQTT_SUBSCRIBE:
             SubscribeTopicWithPostfix(ziot.mainTopic, "/hello/accepted");
             SubscribeTopicWithPostfix(ziot.mainTopic, "/hello/rejected");
+            SubscribeTopicWithPostfix(ziot.mainTopic, "/chitchat/res");
+            SubscribeTopicWithPostfix(ziot.shadowTopic, "/delta");
+            SubscribeTopicWithPostfix(ziot.shadowTopic, "/rejected");
+            SubscribeTopicWithPostfix(ziot.shadowTopic, "/accepted");
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+            SubscribeTopicWithPostfix(ziotUart.mainTopic, "/data");
+#endif  // FIRMWARE_ZIOT_UART_MODULE
             break;
         case FUNC_COMMAND:
             if (strcmp(XdrvMailbox.topic, "RES") == 0)
