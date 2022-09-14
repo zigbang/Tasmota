@@ -914,9 +914,12 @@ void MqttConnected(void) {
 
     XdrvCall(FUNC_MQTT_SUBSCRIBE);
     XsnsCall(FUNC_MQTT_SUBSCRIBE);
+
+    TasmotaGlobal.mqtt_reconnected = true;
   }
 
   if (Mqtt.initial_connection_state) {
+    TasmotaGlobal.mqtt_reconnected = false;
 #ifndef FIRMWARE_ZIOT
     if (ResetReason() != REASON_DEEP_SLEEP_AWAKE) {
       char stopic2[TOPSZ];
@@ -1000,6 +1003,9 @@ void MqttReconnect(void) {
   TasmotaGlobal.mqtt_connected = false;
   Mqtt.retry_counter = Settings->mqtt_retry * Mqtt.retry_counter_delay;
   TasmotaGlobal.global_state.mqtt_down = 1;
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+  TasmotaGlobal.isCloudConnected = false;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
 
 #ifdef FIRMWARE_MINIMAL
 #ifndef USE_MQTT_TLS
@@ -1174,6 +1180,9 @@ void MqttCheck(void) {
   if (Settings->flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     if (!MqttIsConnected()) {
       TasmotaGlobal.global_state.mqtt_down = 1;
+#ifdef FIRMWARE_ZIOT_UART_MODULE
+      TasmotaGlobal.isCloudConnected = false;
+#endif  // FIRMWARE_ZIOT_UART_MODULE
       if (!Mqtt.retry_counter) {
         MqttReconnect();
       } else {

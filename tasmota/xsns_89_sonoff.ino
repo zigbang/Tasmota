@@ -36,7 +36,7 @@ struct TimeoutChecker {
 
 struct ZIoTSonoff {
     bool ready = false;
-    char* version = "1.0.10";
+    char* version = "1.0.11";
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
     char shadowTopic[70];
@@ -196,7 +196,7 @@ bool Xsns89(uint8_t function)
                         SettingsText(SET_MQTT_TOPIC));
                 snprintf_P(ziotSonoff.shadowTopic, sizeof(ziotSonoff.shadowTopic), PSTR("$aws/things/%s/shadow/update"), \
                         SettingsText(SET_MQTT_TOPIC));
-                InitZIoT(ziotSonoff.version, ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.mainTopic, StartTimerHello, StartTimerChitChat, ClearTimerChitChat);
+                InitZIoT(ziotSonoff.version, ziotSonoff.schemeVersion, ziotSonoff.vendor, ziotSonoff.thingType, ziotSonoff.mainTopic, ziotSonoff.shadowTopic, StartTimerHello, StartTimerChitChat, ClearTimerChitChat);
             break;
             case FUNC_COMMAND:
                 // printf("topic : %s, data : %s\n", XdrvMailbox.topic, XdrvMailbox.data);
@@ -205,11 +205,6 @@ bool Xsns89(uint8_t function)
                         strcpy(XdrvMailbox.topic, "");
                         ziotSonoff.timeoutChecker[HELLO_RESPONSE_CHECKER].ready = false;
                         ziotSonoff.timeoutChecker[HELLO_RESPONSE_CHECKER].count = 0;
-                        
-                        SubscribeTopicWithPostfix(ziotSonoff.shadowTopic, "/delta");
-                        SubscribeTopicWithPostfix(ziotSonoff.shadowTopic, "/rejected");
-                        SubscribeTopicWithPostfix(ziotSonoff.shadowTopic, "/accepted");
-                        SubscribeTopicWithPostfix(ziotSonoff.mainTopic, "/chitchat/res");
 
                         UpdateInitialShadow();
                     }
@@ -280,6 +275,11 @@ bool Xsns89(uint8_t function)
                 }
                 break;
             case FUNC_EVERY_SECOND:
+                if (TasmotaGlobal.mqtt_reconnected) {
+                    UpdateInitialShadow();
+                    TasmotaGlobal.mqtt_reconnected = false;
+                }
+
                 CheckTimerList();
                 break;
 #endif  // FIRMWARE_ZIOT_MINIMAL

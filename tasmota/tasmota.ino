@@ -220,12 +220,14 @@ struct {
 #ifdef FIRMWARE_ZIOT
   char ziot_ota_url[100];
   char ziot_access_token[311];
+  bool mqtt_reconnected = false;
 #endif  // FIRMWARE_ZIOT
 #ifdef FIRMWARE_ZIOT_UART_MODULE
 #define AP_MODE 0
 #define PROVISIONING_MODE 1
 #define STATION_MODE 2
   uint8_t ziot_mode = AP_MODE;
+  bool isCloudConnected = false;
 #endif  // FIRMWARE_ZIOT_UART_MODULE
 } TasmotaGlobal;
 
