@@ -36,7 +36,7 @@ struct TimeoutChecker {
 
 struct ZIoTSonoff {
     bool ready = false;
-    char* version = "1.0.11";
+    char* version = "1.0.12";
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
     char shadowTopic[70];
