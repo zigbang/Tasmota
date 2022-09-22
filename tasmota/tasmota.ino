@@ -359,12 +359,14 @@ void setup(void) {
   if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
     SettingsUpdateText(SET_OTAURL, OTA_URL_DEV);
 #ifdef FIRMWARE_ZIOT
+    SettingsUpdateText(SET_MQTT_HOST, MQTT_HOST_DEV);
     strcpy(TasmotaGlobal.ziot_ota_url, OTA_URL_DEV);
 #endif  // FIRMWARE_ZIOT
   }
   else {
     SettingsUpdateText(SET_OTAURL, OTA_URL_PROD);
 #ifdef FIRMWARE_ZIOT
+    SettingsUpdateText(SET_MQTT_HOST, MQTT_HOST_PROD);
     strcpy(TasmotaGlobal.ziot_ota_url, OTA_URL_PROD);
 #endif  // FIRMWARE_ZIOT
   }

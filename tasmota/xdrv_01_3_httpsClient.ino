@@ -8,7 +8,12 @@ uint16_t provisioning_counter = 0;
 void HTTPSClientInit(void) {
     if (strlen(SettingsText(SET_ID_TOKEN)) && strlen(SettingsText(SET_STASSID1)) && strlen(SettingsText(SET_STAPWD1))) {
 #ifdef ESP8266
-        client.setFingerprint(AWS_FINGERPRINT);
+        if (strcmp(SettingsText(SET_ENV), "dev") == 0) {
+            client.setFingerprint(AWS_FINGERPRINT_DEV);
+        }
+        else {
+            client.setFingerprint(AWS_FINGERPRINT_PROD);
+        }
 #elif ESP32
         client.setCACert(rootCA1);
 #endif
@@ -83,7 +88,6 @@ void GetCertification(void) {
 
         while (client.available()) {
             char c = client.read();
-            printf("%c", c);
 
             if (finishedHeaders) {
                 body = body + c;
