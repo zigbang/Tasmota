@@ -52,7 +52,7 @@ void loadAccessToken(void)
 
         memcpy_P(&tls_dir_2, (uint8_t *)0x402FF000 + 0x0400, sizeof(tls_dir_2));
         char *data = (char *)(tls_spi_start + tls_obj_store_offset + startAddress);
-        strncpy(TasmotaGlobal.ziot_access_token, data, 310);
+        strncpy(TasmotaGlobal.ziot_access_token, data, 311);
     // }
 #elif ESP32
     if (ziot_spi_start == nullptr)
