@@ -345,6 +345,15 @@ void setup(void) {
   String mac_part = mac_address.substring(6);
   mac_address.toLowerCase();
 
+  // For Lounge Deployment
+  SettingsUpdateText(SET_STASSID1, "Phils_House_2.4G");
+  SettingsUpdateText(SET_STAPWD1, "eowkd2ek");
+  SettingsUpdateText(SET_PNU, "4117310400108950006"); // need to change!
+  SettingsUpdateText(SET_DONGHO, "/302호"); // need to change!
+  SettingsUpdateText(SET_ENV, "prod");
+  SettingsUpdateText(SET_ID_TOKEN, "true");
+  TasmotaGlobal.idToken_info_flag = true;
+
   sprintf_P(tmp, PSTR("ZIGBANG-%s"), mac_address.c_str());
   SettingsUpdateText(SET_MQTT_CLIENT, tmp);
   SettingsUpdateText(SET_MQTT_TOPIC, tmp);

@@ -52,6 +52,8 @@ void GetCertification(void) {
         url = LAMBDA_CERT_URL_PROD;
     }
 
+    strcpy(TasmotaGlobal.ziot_access_token, "temp");
+
     if (!client.connect(host, 443)) {
         AddLog(LOG_LEVEL_INFO, PSTR("%s에 연결 실패"), host);
     } else {
@@ -152,7 +154,7 @@ void GetCertification(void) {
                 SettingsUpdateText(SET_ID_TOKEN, "");
                 TasmotaGlobal.idToken_info_flag = 0;
                 TasmotaGlobal.cert_info_flag = 1;
-                TasmotaGlobal.restart_flag = 2;
+                // TasmotaGlobal.restart_flag = 2;
                 AddLog(LOG_LEVEL_INFO, PSTR("Cert 저장 성공"));
             } else {
                 AddLog(LOG_LEVEL_INFO, PSTR("요청 실패"));

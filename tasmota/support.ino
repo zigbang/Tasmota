@@ -2431,6 +2431,7 @@ void AddLogData(uint32_t loglevel, const char* log_data, const char* log_data_pa
 }
 
 void AddLog(uint32_t loglevel, PGM_P formatP, ...) {
+#ifdef DEBUG
   va_list arg;
   va_start(arg, formatP);
   char* log_data = ext_vsnprintf_malloc_P(formatP, arg);
@@ -2439,6 +2440,8 @@ void AddLog(uint32_t loglevel, PGM_P formatP, ...) {
 
   AddLogData(loglevel, log_data);
   free(log_data);
+#else
+#endif
 }
 
 void AddLogBuffer(uint32_t loglevel, uint8_t *buffer, uint32_t count)
