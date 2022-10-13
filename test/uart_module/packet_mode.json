@@ -1,0 +1,124 @@
+{
+  "testSetName": "Packet Mode",
+  "target": "ziot",
+  "protocol": [
+    "0x5a",
+    "0x62",
+    "seq",
+    "ack",
+    "data",
+    "checksum",
+    "0x0d",
+    "0x0a"
+  ],
+  "testSet": {},
+  "testCaseList": {
+    "All": {
+      "PASS": {
+        "Control": {
+          "Status": {
+            "Script": [
+              "Delay 5000",
+              "RequestUsingData {\"type\":\"ctrl\",\"data\":{\"cmnd\":\"stat\",\"val\":null}}",
+              "Delay 1000",
+              "CheckValueOfKey ['data.cmnd','data.val.mode','data.val.con'] == ['stat','2','2']"
+            ]
+          },
+          "Reboot": {
+            "Script": [
+              "Delay 5000",
+              "RequestUsingData {\"type\":\"ctrl\",\"data\":{\"cmnd\":\"rbt\",\"val\":null}}",
+              "Delay 1000",
+              "CheckValueOfKey ['data.cmnd','data.val'] == ['rbt','null']"
+            ]
+          },
+          "Reset": {
+            "Factory Reset": {
+              "Script": [
+                "Delay 5000",
+                "RequestUsingData {\"type\":\"ctrl\",\"data\":{\"cmnd\":\"rst\",\"val\":\"fty\"}}",
+                "Delay 1000",
+                "CheckValueOfKey ['data.cmnd','data.val'] == ['rst','fty']"
+              ]
+            },
+            "Wifi Reset": {
+              "Script": [
+                "Delay 5000",
+                "RequestUsingData {\"type\":\"ctrl\",\"data\":{\"cmnd\":\"rst\",\"val\":\"wifi\"}}",
+                "Delay 1000",
+                "CheckValueOfKey ['data.cmnd','data.val'] == ['rst','wifi']"
+              ]
+            }
+          }
+        },
+        "Event": {
+          "Script": [
+            "Delay 5000",
+            "RequestUsingData {\"type\":\"evt\",\"data\":{}}",
+            "Delay 1000",
+            "CheckValueOfKey ['data.cmnd','data.val'] == ['evt','null']"
+          ]
+        },
+        "Error": {
+          "Start Pattern": {
+            "Script": [
+              "Delay 5000",
+              "Request 1 1 1 1 0 0 0 0",
+              "Delay 1000",
+              "CheckValueOfKey ['data.val.errCode'] == ['2']"
+            ]
+          },
+          "Buffer overflowed": {
+            "Script": [
+              "Delay 5000",
+              "Request 0x5a 0x62 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+              "Delay 1000",
+              "CheckValueOfKey ['data.val.errCode'] == ['3']"
+            ]
+          },
+          "Rx timeout": {
+            "Script": [
+              "Delay 5000",
+              "Request 0x5a 0x62 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0",
+              "Delay 6000",
+              "CheckValueOfKey ['data.val.errCode'] == ['4']"
+            ]
+          },
+          "Wrong cmnd or value": {
+            "Script": [
+              "Delay 5000",
+              "RequestUsingData {\"type\":\"ctrl\",\"data\":{\"cmnd\":\"null\",\"val\":null}}",
+              "Delay 1000",
+              "CheckValueOfKey ['data.val.errCode'] == ['5']"
+            ]
+          },
+          "Wrong type": {
+            "Script": [
+              "Delay 5000",
+              "RequestUsingData {\"type\":\"null\",\"data\":{}}",
+              "Delay 1000",
+              "CheckValueOfKey ['data.val.errCode'] == ['6']"
+            ]
+          },
+          "Wrong json format": {
+            "Script": [
+              "Delay 5000",
+              "RequestUsingData {\"type\":\"ctrl\",\"data\":\"cmnd\":\"null\",\"val\":null}}",
+              "Delay 1000",
+              "CheckValueOfKey ['data.val.errCode'] == ['7']"
+            ]
+          },
+          "Wrong checksum": {
+            "Script": [
+              "Delay 5000",
+              "Request 0x5a 0x62 1 1 0 0 0 0 0 0 0 0 0 0 0 0x0d 0x0a",
+              "Delay 5000",
+              "CheckValueOfKey ['data.val.errCode'] == ['8']"
+            ]
+          }
+        }
+      },
+      "FAIL": {}
+    }
+  }
+}
