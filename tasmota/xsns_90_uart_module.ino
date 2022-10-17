@@ -156,12 +156,12 @@ struct TimeoutChecker
 struct ZIoTUART
 {
     bool ready = false;
-    char *version = "1.0.10";
+    char *version = "1.0.12";
     char *recvBuffer = nullptr;
     int recvLength = 0;
     uint32_t rxTime = 0;
-    uint8_t seq = 1;
-    uint8_t ack = 1;
+    uint8_t seq = 0;
+    uint8_t ack = 0;
     bool startFlag = false;
     char *sendBuffer = nullptr;
     PacketQueue packetQueue;
@@ -399,6 +399,7 @@ void AnalyzePacket(void *arg)
 {
     while (true)
     {
+        vTaskDelay(1);
         portENTER_CRITICAL(&rx_mutex);
         int recvLength = ziotUart.recvLength;
         char startByte1 = ziotUart.recvBuffer[0];
@@ -706,21 +707,25 @@ void ResponsePacketMaker(char *format, ...)
 
     portENTER_CRITICAL(&rx_mutex);
     if (ziotUart.seq == 255) {
-        ziotUart.seq = 1;
+        ziotUart.seq = 0;
     }
     seq = ziotUart.seq++;
     portEXIT_CRITICAL(&rx_mutex);
 
     sendBuffer[0] = 'Z';
     sendBuffer[1] = 'b';
-    sendBuffer[2] = seq;
-    sendBuffer[3] = ack;
+    sendBuffer[2] = 1;
+    sendBuffer[3] = 1;
 
     va_start(arg, format);
     vsprintf(sendBuffer + 4, format, arg);
     va_end(arg);
 
     int length = strlen(sendBuffer);
+
+    sendBuffer[2] = seq;
+    sendBuffer[3] = ack;
+
     char checksumByte = CalculateChecksum(sendBuffer + 2, length - 2);
 
     sendBuffer[length] = checksumByte;
@@ -728,8 +733,8 @@ void ResponsePacketMaker(char *format, ...)
     sendBuffer[length + 2] = '\n';
     sendBuffer[length + 3] = '\0';
 
-    printf("[DBG] Send response : %s\n", sendBuffer);
-    ZIoTSerial->write((const char *)sendBuffer);
+    printf("[DBG] Send response : %s\n", sendBuffer + 4);
+    ZIoTSerial->write((uint8_t *)sendBuffer, length + 4);
 }
 
 void RequestPacketMaker(char *format, ...)
@@ -741,7 +746,7 @@ void RequestPacketMaker(char *format, ...)
 
     portENTER_CRITICAL(&rx_mutex);
     if (ziotUart.seq == 255) {
-        ziotUart.seq = 1;
+        ziotUart.seq = 0;
     }
     seq = ziotUart.seq++;
     portEXIT_CRITICAL(&rx_mutex);
@@ -817,7 +822,7 @@ bool Xsns90(uint8_t function)
         case FUNC_INIT:
             vPortCPUInitializeMutex(&rx_mutex);
             xTaskCreate(UartInputHandler, "uart_rx_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL);
-            xTaskCreate(AnalyzePacket, "analyze_packet_task", 1024 * 4, NULL, tskIDLE_PRIORITY, NULL);
+            xTaskCreate(AnalyzePacket, "analyze_packet_task", 1024 * 6, NULL, tskIDLE_PRIORITY, NULL);
 
             snprintf_P(ziotUart.mainTopic, sizeof(ziotUart.mainTopic), PSTR("ziot/sonoff/basicr2/%s"),
                        SettingsText(SET_MQTT_TOPIC));
