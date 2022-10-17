@@ -410,7 +410,7 @@ void ZIoTHandler(uint8_t function)
             SubscribeTopicWithPostfix(ziot.shadowTopic, "/rejected");
             SubscribeTopicWithPostfix(ziot.shadowTopic, "/accepted");
 #ifdef FIRMWARE_ZIOT_UART_MODULE
-            SubscribeTopicWithPostfix(ziotUart.mainTopic, "/data");
+            SubscribeTopicWithPostfix(ziot.mainTopic, "/data");
 #endif  // FIRMWARE_ZIOT_UART_MODULE
             break;
         case FUNC_COMMAND:
