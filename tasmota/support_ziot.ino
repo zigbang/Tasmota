@@ -291,7 +291,7 @@ void MakeStatusesLastFormat(uint8_t numberOfArray, char **codeArray, char **valu
 
 bool SaveTargetOtaUrl(char *url)
 {
-    uint8_t* spi_buffer = nullptr;
+    uint8_t *spi_buffer = nullptr;
     spi_buffer = (uint8_t *)malloc(tls_spi_len);
     if (!spi_buffer)
     {
@@ -409,9 +409,6 @@ void ZIoTHandler(uint8_t function)
             SubscribeTopicWithPostfix(ziot.shadowTopic, "/delta");
             SubscribeTopicWithPostfix(ziot.shadowTopic, "/rejected");
             SubscribeTopicWithPostfix(ziot.shadowTopic, "/accepted");
-#ifdef FIRMWARE_ZIOT_UART_MODULE
-            SubscribeTopicWithPostfix(ziot.mainTopic, "/data");
-#endif  // FIRMWARE_ZIOT_UART_MODULE
             break;
         case FUNC_COMMAND:
             if (strcmp(XdrvMailbox.topic, "RES") == 0)
@@ -468,7 +465,8 @@ void ZIoTHandler(uint8_t function)
                 ziot.timerList[TIMER_HELLO_START]();
                 ziot.needHello = false;
             }
-            else if (TasmotaGlobal.global_state.mqtt_down) {
+            else if (TasmotaGlobal.global_state.mqtt_down)
+            {
                 ziot.needHello = true;
             }
 #endif // ESP32

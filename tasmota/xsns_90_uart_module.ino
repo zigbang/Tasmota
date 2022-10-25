@@ -6,7 +6,7 @@
 #define XSNS_90 90
 
 #define ZIOT_BUFFER_SIZE 1024
-#define ZIOT_BAUDRATE 115200
+#define ZIOT_BAUDRATE 9600
 #define HARDWARE_FALLBACK 2
 #define ZIOT_UART_RX_PIN 14
 #define ZIOT_UART_TX_PIN 12
@@ -164,6 +164,7 @@ struct ZIoTUART
     uint8_t ack = 0;
     bool startFlag = false;
     char *sendBuffer = nullptr;
+    uint16_t sendLength = 0;
     PacketQueue packetQueue;
 #ifndef FIRMWARE_ZIOT_MINIMAL
     char mainTopic[60];
@@ -229,33 +230,21 @@ void CheckTimerList(void)
                     case SHADOW_RESPONSE_CHECKER:
                         switch (ziotUart.lastShadow)
                         {
-                            case NO_SHADOW:
-                                ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
-                                ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
-                                break;
-                            case INITIAL_SHADOW:
-                                UpdateInitialShadow();
-                                break;
-                            // case SWITICH_OFF_SHADOW_ONLY_REPORTED:
-                            //     UpdateShadowOnlyReported(SWITCH_OFF);
-                            //     break;
-                            // case SWITICH_ON_SHADOW_ONLY_REPORTED:
-                            //     UpdateShadowOnlyReported(SWITCH_ON);
-                            //     break;
-                            // case SWITICH_OFF_SHADOW_WITH_DESIRED:
-                            //     UpdateShadowWithDesired(SWITCH_OFF);
-                            //     break;
-                            // case SWITICH_ON_SHADOW_WITH_DESIRED:
-                            //     UpdateShadowWithDesired(SWITCH_ON);
-                            //     break;
+                        case NO_SHADOW:
+                            ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
+                            ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
+                            break;
+                        case INITIAL_SHADOW:
+                            UpdateInitialShadow();
+                            break;
                         default:
                             break;
                         }
                         break;
                     case UART_RESPONSE_CHECKER:
                         printf("[DBG] Response didn't arrive in 10s\n");
-                        printf("[DBG] Send event to mcu again : %s\n", ziotUart.sendBuffer);
-                        ZIoTSerial->write((const char *)ziotUart.sendBuffer);
+                        printf("[DBG] Send event to mcu again : %s\n", ziotUart.sendBuffer + 4);
+                        ZIoTSerial->write((uint8_t*)ziotUart.sendBuffer, ziotUart.sendLength);
                         break;
                     default:
                         break;
@@ -542,13 +531,17 @@ void ParsePacket(void)
                 {
                     printf("[ERR] Can't send event message. Network is not connected to cloud\n");
                     ResponsePacketMaker((char *)S_JSON_UART_MODULE_RESPONSE_ERROR, "evt", ERROR_CODE_TX_EVENT_FAILED, "Network is not connected to cloud");
-                } else {
+                }
+                else
+                {
                     HandleEventTypePacket(temp);
                 }
             }
             else if (strcmp(typeChar, "resp") == 0)
             {
-                if (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready && (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].seq == rxAck)) {
+                // if (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready && (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].seq == rxAck))
+                if (ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready)
+                {
                     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready = false;
                     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].count = 0;
                     printf("[DBG] Received response : %s\n", data);
@@ -706,7 +699,8 @@ void ResponsePacketMaker(char *format, ...)
     uint8_t ack = ziotUart.ack;
 
     portENTER_CRITICAL(&rx_mutex);
-    if (ziotUart.seq == 255) {
+    if (ziotUart.seq == 255)
+    {
         ziotUart.seq = 0;
     }
     seq = ziotUart.seq++;
@@ -745,7 +739,8 @@ void RequestPacketMaker(char *format, ...)
     uint8_t ack = ziotUart.ack;
 
     portENTER_CRITICAL(&rx_mutex);
-    if (ziotUart.seq == 255) {
+    if (ziotUart.seq == 255)
+    {
         ziotUart.seq = 0;
     }
     seq = ziotUart.seq++;
@@ -753,14 +748,18 @@ void RequestPacketMaker(char *format, ...)
 
     sendBuffer[0] = 'Z';
     sendBuffer[1] = 'b';
-    sendBuffer[2] = seq;
-    sendBuffer[3] = ack;
+    sendBuffer[2] = 1;
+    sendBuffer[3] = 1;
 
     va_start(arg, format);
     vsprintf(sendBuffer + 4, format, arg);
     va_end(arg);
 
     int length = strlen(sendBuffer);
+
+    sendBuffer[2] = seq;
+    sendBuffer[3] = ack;
+
     char checksumByte = CalculateChecksum(sendBuffer + 2, length - 2);
 
     sendBuffer[length] = checksumByte;
@@ -768,24 +767,25 @@ void RequestPacketMaker(char *format, ...)
     sendBuffer[length + 2] = '\n';
     sendBuffer[length + 3] = '\0';
 
-    printf("[DBG] Send request : %s\n", sendBuffer);
+    printf("[DBG] Send request : %s\n", sendBuffer + 4);
 
     portENTER_CRITICAL(&rx_mutex);
     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].startTime = GetUsTime();
     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].ready = true;
     ziotUart.timeoutChecker[UART_RESPONSE_CHECKER].seq = seq;
 
-    memcpy(ziotUart.sendBuffer, sendBuffer, ZIOT_BUFFER_SIZE);
+    ziotUart.sendLength = length + 4;
+    memcpy(ziotUart.sendBuffer, sendBuffer, ziotUart.sendLength);
     portEXIT_CRITICAL(&rx_mutex);
 
-    ZIoTSerial->write((const char *)sendBuffer);
+    ZIoTSerial->write((uint8_t *)ziotUart.sendBuffer, ziotUart.sendLength);
 }
 
 void HandleEventTypePacket(char *data)
 {
     printf("[DBG] Send event to cloud : %s\n", data);
     // TODO: ziot uart module topic and postfix 정의
-    PublishTopicWithPostfix(data, "ziot-uart-module", "/event");
+    UpdateShadow(ziotUart.shadowTopic, "%s", data);
     ResponsePacketMaker((char *)S_JSON_UART_MODULE_RESPONSE, "evt", "null");
 }
 
@@ -867,25 +867,14 @@ bool Xsns90(uint8_t function)
                         case INITIAL_SHADOW:
                             UpdateInitialShadow();
                             break;
-                        case SWITICH_OFF_SHADOW_ONLY_REPORTED:
-                            UpdateShadowOnlyReported(SWITCH_OFF);
-                            break;
-                        case SWITICH_ON_SHADOW_ONLY_REPORTED:
-                            UpdateShadowOnlyReported(SWITCH_ON);
-                            break;
-                        case SWITICH_OFF_SHADOW_WITH_DESIRED:
-                            UpdateShadowWithDesired(SWITCH_OFF);
-                            break;
-                        case SWITICH_ON_SHADOW_WITH_DESIRED:
-                            UpdateShadowWithDesired(SWITCH_ON);
-                            break;
                         default:
                             break;
                         }
                     }
                     else
                     {
-                        if (ziotUart.lastShadow == INITIAL_SHADOW) {
+                        if (ziotUart.lastShadow == INITIAL_SHADOW)
+                        {
                             TasmotaGlobal.isCloudConnected = true;
                             printf("[DBG] Successfully updated the initial shadow\n");
                         }
@@ -900,30 +889,6 @@ bool Xsns90(uint8_t function)
                     if (strcmp(XdrvMailbox.topic, "DELTA") == 0)
                     {
                         strcpy(XdrvMailbox.topic, "");
-
-                        JsonParser parser(XdrvMailbox.data);
-
-                        JsonParserObject root = parser.getRootObject();
-                        JsonParserObject state = root["state"].getObject();
-                        JsonParserObject status = state["status"].getObject();
-
-                        String switch1 = status["switch1"].getStr();
-                        char *switch1CharType = (char *)switch1.c_str();
-
-                        if ((strcmp(switch1CharType, "true") == 0) && bitRead(TasmotaGlobal.power, 0) == 0)
-                        {
-                            SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
-                            UpdateShadowOnlyReported(SWITCH_ON);
-                        }
-                        else if ((strcmp(switch1CharType, "false") == 0) && bitRead(TasmotaGlobal.power, 0) == 1)
-                        {
-                            SetAllPower(POWER_TOGGLE_NO_STATE, SRC_MQTT);
-                            UpdateShadowOnlyReported(SWITCH_OFF);
-                        }
-                    }
-                    else if (strcmp(XdrvMailbox.topic, "DATA") == 0)
-                    {
-                        // TODO: event에 대한 토픽 이름 정의
                         printf("[DBG] Send event to mcu : %s\n", XdrvMailbox.data);
                         RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST, "evt", XdrvMailbox.data);
                     }
@@ -937,9 +902,11 @@ bool Xsns90(uint8_t function)
             }
             break;
         case FUNC_EVERY_SECOND:
-            if (!TasmotaGlobal.global_state.mqtt_down && ziotUart.needUpdateInitialShadow) {
+            if (!TasmotaGlobal.global_state.mqtt_down && ziotUart.needUpdateInitialShadow)
+            {
                 ziotUart.second++;
-                if (ziotUart.second >= 10) {
+                if (ziotUart.second >= 10)
+                {
                     UpdateInitialShadow();
 
                     ziotUart.needUpdateInitialShadow = false;
@@ -947,7 +914,8 @@ bool Xsns90(uint8_t function)
                 }
             }
 
-            if (TasmotaGlobal.mqtt_reconnected) {
+            if (TasmotaGlobal.mqtt_reconnected)
+            {
                 TasmotaGlobal.mqtt_reconnected = false;
                 ziotUart.needUpdateInitialShadow = true;
                 ziotUart.second = 9;
