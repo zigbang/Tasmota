@@ -22,13 +22,7 @@
 
 #define NO_SHADOW -1
 #define INITIAL_SHADOW 0
-#define SWITICH_OFF_SHADOW_WITH_DESIRED 1
-#define SWITICH_ON_SHADOW_WITH_DESIRED 2
-#define SWITICH_OFF_SHADOW_ONLY_REPORTED 3
-#define SWITICH_ON_SHADOW_ONLY_REPORTED 4
-
-#define SWITCH_OFF 0
-#define SWITCH_ON 1
+#define EVENT_SHADOW 1
 
 #define COMMAND_ERROR -1
 #define COMMAND_NULL 0
@@ -64,7 +58,7 @@ TasmotaSerial *ZIoTSerial = nullptr;
 static portMUX_TYPE rx_mutex;
 
 #ifndef FIRMWARE_ZIOT_MINIMAL
-const char S_JSON_UART_MODULE_SHADOW_WITH_DESIRED[] PROGMEM = "{\"state\":{\"desired\":{\"status\":{\"switch1\":%s}},\"reported\":{\"schemeVersion\":\"%s\",\"vendor\":\"%s\",\"thingType\":\"%s\",\"firmwareVersion\":\"%s\",\"status\":{\"isConnected\":true,\"batteryPercentage\":100,\"switch1\":%s,\"countdown1\":0,\"relayStatus\":\"2\",\"cycleTime\":\"\",\"switchInching\":\"\"},\"statusesLast\":[%s]}}}";
+// TODO: Response_stat 등 모두 Response 하나로 통일
 const char S_JSON_UART_MODULE_SHADOW[] PROGMEM = "{\"state\":{\"reported\":{\"schemeVersion\":\"%s\",\"vendor\":\"%s\",\"thingType\":\"%s\",\"firmwareVersion\":\"%s\",\"status\":{\"isConnected\":true,\"batteryPercentage\":100,\"switch1\":%s,\"countdown1\":0,\"relayStatus\":\"2\",\"cycleTime\":\"\",\"switchInching\":\"\"},\"statusesLast\":[%s]}}}";
 const char S_JSON_UART_MODULE_RESPONSE[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":%s}}";
 const char S_JSON_UART_MODULE_RESPONSE_STAT[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":{\"mode\":%c,\"con\":%c}}}";
@@ -83,7 +77,7 @@ bool IsQueueEmpty(PacketQueue *queue)
     return queue->count == 0;
 }
 
-void Enqueue(PacketQueue *queue, uint8_t seq, uint8_t ack, char *data, int length)
+void Enqueue(PacketQueue *queue, uint8_t seq, uint8_t ack, char *data, uint16_t length)
 {
     Packet *newPacket = (Packet *)malloc(sizeof(Packet));
     newPacket->seq = seq;
@@ -105,7 +99,7 @@ void Enqueue(PacketQueue *queue, uint8_t seq, uint8_t ack, char *data, int lengt
     queue->count++;
 }
 
-void Dequeue(PacketQueue *queue, uint8_t *seq = nullptr, uint8_t *ack = nullptr, char *dest = nullptr, int *length = nullptr)
+void Dequeue(PacketQueue *queue, uint8_t *seq = nullptr, uint8_t *ack = nullptr, char *dest = nullptr, uint16_t *length = nullptr)
 {
     Packet *ptr;
     if (IsQueueEmpty(queue))
@@ -132,6 +126,7 @@ void Dequeue(PacketQueue *queue, uint8_t *seq = nullptr, uint8_t *ack = nullptr,
         *length = ptr->length;
     }
     queue->front = ptr->next;
+    free(ptr->data);
     free(ptr);
     queue->count--;
 }
@@ -153,28 +148,35 @@ struct TimeoutChecker
 };
 #endif // FIRMWARE_ZIOT_MINIMAL
 
+typedef struct LastShadow
+{
+    int8_t lastShadowType;
+    char *lastShadowBuffer;
+    uint16_t lastShadowLength;
+} LastShadow;
+
 struct ZIoTUART
 {
     bool ready = false;
     char *version = "1.0.12";
     char *recvBuffer = nullptr;
+    char *sendBuffer = nullptr;
     int recvLength = 0;
+    uint16_t sendLength = 0;
     uint32_t rxTime = 0;
     uint8_t seq = 0;
     uint8_t ack = 0;
     bool startFlag = false;
-    char *sendBuffer = nullptr;
-    uint16_t sendLength = 0;
     PacketQueue packetQueue;
 #ifndef FIRMWARE_ZIOT_MINIMAL
+    LastShadow lastShadow = {NO_SHADOW, nullptr, 0};
     char mainTopic[60];
     char shadowTopic[70];
     char *schemeVersion = "v220530";
     char *vendor = "zigbang";
     char *thingType = "Switch";
-    int8_t lastShadow = NO_SHADOW;
     TimeoutChecker timeoutChecker[MAX_RESPONSE_CHECKER];
-    uint32_t second = 0;
+    uint32_t globalSecond = 0;
     bool needUpdateInitialShadow = false;
 #endif // FIRMWARE_ZIOT_MINIMAL
 } ziotUart;
@@ -198,8 +200,6 @@ void ClearTimerChitChat(void)
     ziotUart.timeoutChecker[CHITCHAT_RESPONSE_CHECKER].count = 0;
 }
 
-// TODO: 여러개의 Response에 대한 CheckTimer 구현
-
 void CheckTimerList(void)
 {
     for (uint8_t i = 0; i < MAX_RESPONSE_CHECKER; i++)
@@ -208,7 +208,7 @@ void CheckTimerList(void)
         {
             if (IsTimeout(ziotUart.timeoutChecker[i].startTime, RESPONSE_TIMEOUT_US))
             {
-                if (ziotUart.timeoutChecker[i].count == MAX_RETRY_COUNT)
+                if (ziotUart.timeoutChecker[i].count >= MAX_RETRY_COUNT)
                 {
                     printf("[Error] %d is reached to the max retry count. Reboot the device\n", i);
                     SettingsSaveAll();
@@ -228,7 +228,7 @@ void CheckTimerList(void)
                         PublishChitChat(ziotUart.mainTopic);
                         break;
                     case SHADOW_RESPONSE_CHECKER:
-                        switch (ziotUart.lastShadow)
+                        switch (ziotUart.lastShadow.lastShadowType)
                         {
                         case NO_SHADOW:
                             ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
@@ -237,6 +237,12 @@ void CheckTimerList(void)
                         case INITIAL_SHADOW:
                             UpdateInitialShadow();
                             break;
+                        case EVENT_SHADOW:
+                            if (ziotUart.lastShadow.lastShadowBuffer != nullptr)
+                            {
+                                UpdateEventShadow(ziotUart.lastShadow.lastShadowBuffer, ziotUart.lastShadow.lastShadowLength);
+                            }
+                            break;
                         default:
                             break;
                         }
@@ -244,7 +250,7 @@ void CheckTimerList(void)
                     case UART_RESPONSE_CHECKER:
                         printf("[DBG] Response didn't arrive in 10s\n");
                         printf("[DBG] Send event to mcu again : %s\n", ziotUart.sendBuffer + 4);
-                        ZIoTSerial->write((uint8_t*)ziotUart.sendBuffer, ziotUart.sendLength);
+                        ZIoTSerial->write((uint8_t *)ziotUart.sendBuffer, ziotUart.sendLength);
                         break;
                     default:
                         break;
@@ -276,63 +282,28 @@ void UpdateInitialShadow(void)
 
     ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
     ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
-    ziotUart.lastShadow = INITIAL_SHADOW;
+    ziotUart.lastShadow.lastShadowType = INITIAL_SHADOW;
 
     UpdateShadow(ziotUart.shadowTopic, (char *)S_JSON_UART_MODULE_SHADOW, ziotUart.schemeVersion, ziotUart.vendor, ziotUart.thingType, ziotUart.version, switch1, statusesLast);
 }
 
-void UpdateShadowWithDesired(bool switchValue)
+void UpdateEventShadow(char *data, uint16_t length)
 {
-    char statusesLast[80] = "";
-    char *code[1] = {"switch1"};
-    char *value[1] = {""};
-
-    if (switchValue == SWITCH_OFF)
+    if (ziotUart.lastShadow.lastShadowBuffer != nullptr)
     {
-        strcpy(value[0], "false");
-        MakeStatusesLastFormat(1, code, value, statusesLast);
-
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
-        ziotUart.lastShadow = SWITICH_OFF_SHADOW_WITH_DESIRED;
+        free(ziotUart.lastShadow.lastShadowBuffer);
     }
-    else
-    {
-        strcpy(value[0], "true");
-        MakeStatusesLastFormat(1, code, value, statusesLast);
+    ziotUart.lastShadow.lastShadowBuffer = (char *)malloc(length + 1);
 
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
-        ziotUart.lastShadow = SWITICH_ON_SHADOW_WITH_DESIRED;
-    }
-    UpdateShadow(ziotUart.shadowTopic, (char *)S_JSON_UART_MODULE_SHADOW_WITH_DESIRED, value[0], ziotUart.schemeVersion, ziotUart.vendor, ziotUart.thingType, ziotUart.version, value[0], statusesLast);
-}
+    memcpy(ziotUart.lastShadow.lastShadowBuffer, data, length);
+    ziotUart.lastShadow.lastShadowBuffer[length] = '\0';
+    ziotUart.lastShadow.lastShadowLength = length;
 
-void UpdateShadowOnlyReported(bool switchValue)
-{
-    char statusesLast[80] = "";
-    char *code[1] = {"switch1"};
-    char *value[1] = {""};
+    ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
+    ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
+    ziotUart.lastShadow.lastShadowType = EVENT_SHADOW;
 
-    if (switchValue == SWITCH_OFF)
-    {
-        strcpy(value[0], "false");
-        MakeStatusesLastFormat(1, code, value, statusesLast);
-
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
-        ziotUart.lastShadow = SWITICH_OFF_SHADOW_ONLY_REPORTED;
-    }
-    else
-    {
-        strcpy(value[0], "true");
-        MakeStatusesLastFormat(1, code, value, statusesLast);
-
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = true;
-        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
-        ziotUart.lastShadow = SWITICH_ON_SHADOW_ONLY_REPORTED;
-    }
-    UpdateShadow(ziotUart.shadowTopic, (char *)S_JSON_UART_MODULE_SHADOW, ziotUart.schemeVersion, ziotUart.vendor, ziotUart.thingType, ziotUart.version, value[0], statusesLast);
+    UpdateShadow(ziotUart.shadowTopic, "%s", data);
 }
 
 #endif // FIRMWARE_ZIOT_MINIMAL
@@ -375,6 +346,7 @@ void UartInputHandler(void *arg)
 {
     while (true)
     {
+        vTaskDelay(1);
         while (ZIoTSerial->available())
         {
             portENTER_CRITICAL(&rx_mutex);
@@ -492,7 +464,7 @@ void ParsePacket(void)
         uint8_t rxAck = 1;
         char data[ZIOT_BUFFER_SIZE] = "";
         char forJson[ZIOT_BUFFER_SIZE] = "";
-        int length = 0;
+        uint16_t length = 0;
 
         // TODO: PacketQueue seq 기반 sorting 구현
         Dequeue(&ziotUart.packetQueue, &rxSeq, &rxAck, data, &length);
@@ -534,7 +506,7 @@ void ParsePacket(void)
                 }
                 else
                 {
-                    HandleEventTypePacket(temp);
+                    HandleEventTypePacket(temp, length - 22);
                 }
             }
             else if (strcmp(typeChar, "resp") == 0)
@@ -781,11 +753,10 @@ void RequestPacketMaker(char *format, ...)
     ZIoTSerial->write((uint8_t *)ziotUart.sendBuffer, ziotUart.sendLength);
 }
 
-void HandleEventTypePacket(char *data)
+void HandleEventTypePacket(char *data, uint16_t length)
 {
     printf("[DBG] Send event to cloud : %s\n", data);
-    // TODO: ziot uart module topic and postfix 정의
-    UpdateShadow(ziotUart.shadowTopic, "%s", data);
+    UpdateEventShadow(data, length);
     ResponsePacketMaker((char *)S_JSON_UART_MODULE_RESPONSE, "evt", "null");
 }
 
@@ -860,20 +831,22 @@ bool Xsns90(uint8_t function)
                         strcpy(XdrvMailbox.topic, "");
                         ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
                         ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].startTime = GetUsTime();
-                        switch (ziotUart.lastShadow)
+
+                        switch (ziotUart.lastShadow.lastShadowType)
                         {
-                        case NO_SHADOW:
-                            break;
                         case INITIAL_SHADOW:
-                            UpdateInitialShadow();
+                            printf("[Error] Failed to update the initial shadow\n");
+                            SettingsSaveAll();
+                            EspRestart();
                             break;
                         default:
+                            RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST, "evt", XdrvMailbox.data);
                             break;
                         }
                     }
                     else
                     {
-                        if (ziotUart.lastShadow == INITIAL_SHADOW)
+                        if (ziotUart.lastShadow.lastShadowType == INITIAL_SHADOW)
                         {
                             TasmotaGlobal.isCloudConnected = true;
                             printf("[DBG] Successfully updated the initial shadow\n");
@@ -881,7 +854,7 @@ bool Xsns90(uint8_t function)
 
                         ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
                         ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
-                        ziotUart.lastShadow = NO_SHADOW;
+                        ziotUart.lastShadow.lastShadowType = NO_SHADOW;
                     }
                 }
                 else
@@ -904,13 +877,13 @@ bool Xsns90(uint8_t function)
         case FUNC_EVERY_SECOND:
             if (!TasmotaGlobal.global_state.mqtt_down && ziotUart.needUpdateInitialShadow)
             {
-                ziotUart.second++;
-                if (ziotUart.second >= 10)
+                ziotUart.globalSecond++;
+                if (ziotUart.globalSecond >= 10)
                 {
                     UpdateInitialShadow();
 
                     ziotUart.needUpdateInitialShadow = false;
-                    ziotUart.second = 0;
+                    ziotUart.globalSecond = 0;
                 }
             }
 
@@ -918,7 +891,7 @@ bool Xsns90(uint8_t function)
             {
                 TasmotaGlobal.mqtt_reconnected = false;
                 ziotUart.needUpdateInitialShadow = true;
-                ziotUart.second = 9;
+                ziotUart.globalSecond = 9;
             }
 
             CheckTimerList();
