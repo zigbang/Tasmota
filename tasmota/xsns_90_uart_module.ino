@@ -58,13 +58,13 @@ TasmotaSerial *ZIoTSerial = nullptr;
 static portMUX_TYPE rx_mutex;
 
 #ifndef FIRMWARE_ZIOT_MINIMAL
-// TODO: Response_stat 등 모두 Response 하나로 통일
 const char S_JSON_UART_MODULE_SHADOW[] PROGMEM = "{\"state\":{\"reported\":{\"schemeVersion\":\"%s\",\"vendor\":\"%s\",\"thingType\":\"%s\",\"firmwareVersion\":\"%s\",\"status\":{\"isConnected\":true,\"batteryPercentage\":100,\"switch1\":%s,\"countdown1\":0,\"relayStatus\":\"2\",\"cycleTime\":\"\",\"switchInching\":\"\"},\"statusesLast\":[%s]}}}";
 const char S_JSON_UART_MODULE_RESPONSE[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":%s}}";
 const char S_JSON_UART_MODULE_RESPONSE_STAT[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":{\"mode\":%c,\"con\":%c}}}";
 const char S_JSON_UART_MODULE_RESPONSE_STAT_FULL[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":{\"mode\":%c,\"con\":%c,\"ssid\":\"%s\",\"bssid\":\"%s\",\"ip\":\"%s\",\"gw\":\"%s\"}}}";
 const char S_JSON_UART_MODULE_RESPONSE_ERROR[] PROGMEM = "{\"type\":\"resp\",\"data\":{\"cmnd\":\"%s\",\"val\":{\"errCode\":\"%d\",\"errMsg\":\"%s\"}}}";
 const char S_JSON_UART_MODULE_REQUEST[] PROGMEM = "{\"type\":\"%s\",\"data\":%s}";
+const char S_JSON_UART_MODULE_REQUEST_EVENT[] PROGMEM = "{\"type\":\"%s\",\"data\":{\"dataType\":\"%s\",\"val\":%s}}";
 
 void InitPacketQueue(PacketQueue *queue)
 {
@@ -496,17 +496,24 @@ void ParsePacket(void)
             }
             else if (strcmp(typeChar, "evt") == 0)
             {
-                char temp[ZIOT_BUFFER_SIZE] = "";
-                memcpy(temp, data + 21, length - 22);
+                JsonParserObject eventData = root["data"].getObject();
+                String dataType = eventData["dataType"].getStr();
+                char *dataTypeChar = (char *)dataType.c_str();
 
-                if (TasmotaGlobal.ziot_mode != STATION_MODE || TasmotaGlobal.global_state.wifi_down || TasmotaGlobal.global_state.mqtt_down)
+                if (strcmp(dataTypeChar, "update") == 0)
                 {
-                    printf("[ERR] Can't send event message. Network is not connected to cloud\n");
-                    ResponsePacketMaker((char *)S_JSON_UART_MODULE_RESPONSE_ERROR, "evt", ERROR_CODE_TX_EVENT_FAILED, "Network is not connected to cloud");
-                }
-                else
-                {
-                    HandleEventTypePacket(temp, length - 22);
+                    char temp[ZIOT_BUFFER_SIZE] = "";
+                    memcpy(temp, data + 48, length - 50);
+
+                    if (TasmotaGlobal.ziot_mode != STATION_MODE || TasmotaGlobal.global_state.wifi_down || TasmotaGlobal.global_state.mqtt_down)
+                    {
+                        printf("[ERR] Can't send event message. Network is not connected to cloud\n");
+                        ResponsePacketMaker((char *)S_JSON_UART_MODULE_RESPONSE_ERROR, "evt", ERROR_CODE_TX_EVENT_FAILED, "Network is not connected to cloud");
+                    }
+                    else
+                    {
+                        HandleEventTypePacket(temp, length - 22);
+                    }
                 }
             }
             else if (strcmp(typeChar, "resp") == 0)
@@ -840,20 +847,23 @@ bool Xsns90(uint8_t function)
                             EspRestart();
                             break;
                         default:
-                            RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST, "evt", XdrvMailbox.data);
+                            // RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST_EVENT, "evt", "reject", XdrvMailbox.data);
                             break;
                         }
                     }
-                    else
+                    else if (strcmp(XdrvMailbox.topic, "ACCEPTED") == 0)
                     {
+                        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
+                        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
+
                         if (ziotUart.lastShadow.lastShadowType == INITIAL_SHADOW)
                         {
                             TasmotaGlobal.isCloudConnected = true;
                             printf("[DBG] Successfully updated the initial shadow\n");
+                        } else {
+                            // RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST_EVENT, "evt", "accept", XdrvMailbox.data);
                         }
 
-                        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].ready = false;
-                        ziotUart.timeoutChecker[SHADOW_RESPONSE_CHECKER].count = 0;
                         ziotUart.lastShadow.lastShadowType = NO_SHADOW;
                     }
                 }
@@ -863,7 +873,7 @@ bool Xsns90(uint8_t function)
                     {
                         strcpy(XdrvMailbox.topic, "");
                         printf("[DBG] Send event to mcu : %s\n", XdrvMailbox.data);
-                        RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST, "evt", XdrvMailbox.data);
+                        RequestPacketMaker((char *)S_JSON_UART_MODULE_REQUEST_EVENT, "evt", "delta", XdrvMailbox.data);
                     }
                 }
             }
