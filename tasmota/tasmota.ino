@@ -238,7 +238,7 @@ typedef struct Packet
     uint8_t seq = 0;
     uint8_t ack = 0;
     char *data = nullptr;
-    int length = 0;
+    uint16_t length = 0;
     struct Packet *next;
 } Packet;
 
