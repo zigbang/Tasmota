@@ -870,7 +870,12 @@ void MqttDisconnected(int state) {
 
   MqttClient.disconnect();
 
-  AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECT_FAILED_TO " %s:%d, rc %d. " D_RETRY_IN " %d " D_UNIT_SECOND), SettingsText(SET_MQTT_HOST), Settings->mqtt_port, state, Mqtt.retry_counter);
+  if (Mqtt.retry_counter_delay > 3) {
+    TasmotaGlobal.restart_flag = 2;
+  } else {
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECT_FAILED_TO " %s:%d, rc %d. " D_RETRY_IN " %d " D_UNIT_SECOND), SettingsText(SET_MQTT_HOST), Settings->mqtt_port, state, Mqtt.retry_counter);
+  }
+
   TasmotaGlobal.rules_flag.mqtt_disconnected = 1;
 }
 
