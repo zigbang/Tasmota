@@ -22,14 +22,10 @@
 #endif
 
 // MQTT_MAX_PACKET_SIZE : Maximum packet size. Override with setBufferSize().
-#ifdef ESP8266
 #ifndef MQTT_MAX_PACKET_SIZE
-// #define MQTT_MAX_PACKET_SIZE 256
+//#define MQTT_MAX_PACKET_SIZE 256
 #define MQTT_MAX_PACKET_SIZE 1200     // Tasmota v8.1.0.8
-#endif  // MQTT_MAX_PACKET_SIZE
-#else
-#define MQTT_MAX_PACKET_SIZE 3200     // Tasmota v8.1.0.8
-#endif  // ESP8266
+#endif
 
 // MQTT_KEEPALIVE : keepAlive interval in Seconds. Override with setKeepAlive()
 #ifndef MQTT_KEEPALIVE
