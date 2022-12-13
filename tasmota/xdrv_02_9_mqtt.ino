@@ -873,7 +873,7 @@ void MqttDisconnected(int state) {
   // Check if this solves intermittent MQTT re-connection failures when broker is restarted
   EspClient.stop();
 
-  if (Mqtt.retry_counter_delay > 3) {
+  if (Mqtt.retry_counter_delay > 2) {
     TasmotaGlobal.restart_flag = 2;
   } else {
     AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECT_FAILED_TO " %s:%d, rc %d. " D_RETRY_IN " %d " D_UNIT_SECOND), SettingsText(SET_MQTT_HOST), Settings->mqtt_port, state, Mqtt.retry_counter);
@@ -976,7 +976,7 @@ void MqttConnected(void) {
 void MqttReconnect(void) {
   char stopic[TOPSZ];
 
-  Mqtt.allowed = Settings->flag.mqtt_enabled;  // SetOption3 - Enable MQTT
+  Mqtt.allowed = Settings->flag.mqtt_enabled && (TasmotaGlobal.restart_flag == 0);  // SetOption3 - Enable MQTT, and don't connect if restart in process
   if (Mqtt.allowed) {
 #if defined(USE_MQTT_AZURE_DPS_SCOPEID) && defined(USE_MQTT_AZURE_DPS_PRESHAREDKEY)
   ProvisionAzureDPS();
