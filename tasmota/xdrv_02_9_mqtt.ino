@@ -638,7 +638,8 @@ void MqttPublishPayload(const char* topic, const char* payload, uint32_t binary_
     log_data_topic += topic;                             // stat/tasmota/STATUS2
   } else {
     log_data_topic = F(D_LOG_RESULT);                    // RSL:
-    log_data_topic += strrchr(topic,'/')+1;              // STATUS2
+    char *command = strrchr(topic, '/');                 // If last part of topic it is always the command
+    log_data_topic += (command == nullptr) ? topic : command +1;  // STATUS2
     retained = false;                                    // Without MQTT enabled there is no retained message
   }
   log_data_topic += F(" = ");                            // =
@@ -869,6 +870,8 @@ void MqttDisconnected(int state) {
   }
 
   MqttClient.disconnect();
+  // Check if this solves intermittent MQTT re-connection failures when broker is restarted
+  EspClient.stop();
 
   if (Mqtt.retry_counter_delay > 3) {
     TasmotaGlobal.restart_flag = 2;
